@@ -5,6 +5,12 @@ data/pbp/*
 !data/baselines
 data/baselines/*
 
+# Secrets files:
+.env
+
+# Annoying Mac OSX files
+.DS_Store
+
 # Rust files
 # will have compiled files and executables
 debug/
@@ -20,14 +26,7 @@ Cargo.lock
 # MSVC Windows builds of rustc generate these, which store debugging information
 *.pdb
 
-
 # Python/IPython
-# Secrets files:
-.env
-
-# Annoying Mac OSX files
-.DS_Store
-
 # ipython configs:
 # only keep the startup scripts
 

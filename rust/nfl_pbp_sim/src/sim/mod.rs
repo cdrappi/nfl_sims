@@ -7,10 +7,18 @@ use crate::{
         play_calling::{choose_playcall, PlayType},
     },
     models::{
-        clock::ClockModel, defensive_timeout::DefensiveTimeoutModel, dropback::DropbackModel,
-        features::PlaycallFeatures, field_goals::FgModel, kickoff::KickoffModel,
-        offensive_timeout::OffensiveTimeoutModel, penalty::PenaltyModel, playcall::PlaycallModel,
-        post_pass_penalty::PostPassPenaltyModel, punt::PuntModel, rushing::RushingModel,
+        clock::{ClockModel, PLAYCLOCK},
+        defensive_timeout::DefensiveTimeoutModel,
+        dropback::DropbackModel,
+        features::PlaycallFeatures,
+        field_goals::FgModel,
+        kickoff::KickoffModel,
+        offensive_timeout::OffensiveTimeoutModel,
+        penalty::PenaltyModel,
+        playcall::PlaycallModel,
+        post_pass_penalty::PostPassPenaltyModel,
+        punt::PuntModel,
+        rushing::RushingModel,
         two_point_attempt::TwoPointAttemptModel,
     },
     params::{GameParams, GameParamsDistribution, TeamParams},
@@ -610,9 +618,24 @@ pub fn sim_game(game_params: &GameParamsDistribution) -> BoxScore {
 
         let clock_status = ClockStatus::merge(clock_stops, result.clock_status_after(), is_timeout)
             .transform_clock(&sim.game_state.clock);
-        // clock does not run if there's a timeout or the play type indicates we don't stop clock
+        // clock does not run if play type indicates we don't stop clock,
+        // or there's a timeout with < 3 minutes left in the half
         let rtk_run_clock = match clock_status {
-            ClockStatus::Stopped => false,
+            ClockStatus::Stopped => {
+                if is_timeout
+                    && clock_stops != ClockStatus::Stopped
+                    && sim.game_state.clock.half_minutes_remaining() > 3.0
+                    && sim.game_state.clock.seconds_remaining >= PLAYCLOCK as u16
+                {
+                    // if there's a timeout with > 3 minutes left in the half,
+                    // assume that they are taking a timeout to prevent
+                    // a delay-of-game penalty. in this case, run off the maximum time
+                    // from the clock
+                    sim.game_state
+                        .advance_clock(PLAYCLOCK as u16 - 1, false, true);
+                }
+                false
+            }
             _ => match rtk_end_play {
                 false => sim.runoff_clock(&result, play_duration, clock_status),
                 true => false,
