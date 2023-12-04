@@ -1,6 +1,5 @@
 import os
 import re
-from dataclasses import dataclass
 from typing import Any, Dict, Iterable, Optional, Set, Tuple, Union
 
 import nfl_data_py
@@ -19,18 +18,6 @@ DATA_PATH = f'{os.environ["NFL_SIMS_PATH"]}/data'
 BASELINES_PATH = f"{DATA_PATH}/baselines"
 
 CURRENT_SEASON = 2023
-
-
-@dataclass
-class Game:
-    away: str
-    home: str
-    time: str
-    neutral_field: bool = False
-
-    def teams(self) -> Set[str]:
-        return {self.home, self.away}
-
 
 OUTDOOR = "Outdoor"
 RETRACTABLE = "Retractable"
@@ -219,118 +206,6 @@ def punt_value(yardline_100):
         return 0.8
     else:
         return 1.0
-
-
-DK_TO_NFL_TEAM = {
-    "LAR": "LA",
-    "JAC": "JAX",
-}
-
-FD_TO_NFL_TEAM = {
-    "LAR": "LA",
-}
-
-NFL_TO_FD_NAME = {
-    "Marvin Mims": "Marvin Mims Jr.",
-    "Richie James": "Richie James Jr.",
-    "Chigoziem Okonkwo": "Chig Okonkwo",
-    "Odell Beckham": "Odell Beckham Jr.",
-    "Josh Palmer": "Joshua Palmer",
-    "Donald Parham": "Donald Parham Jr.",
-    "Kavontae Turpin": "KaVontae Turpin",
-    "Travis Etienne": "Travis Etienne Jr.",
-    "Jamycal Hasty": "JaMycal Hasty",
-    "Lynn Bowden": "Lynn Bowden Jr.",
-    "Christopher Brooks": "Chris Brooks",
-    "Cedrick Wilson": "Cedrick Wilson Jr.",
-    "Robbie  Chosen": "Robbie Chosen",
-    "Jeffery Wilson": "Jeff Wilson Jr.",
-    "Ray-Ray McCloud": "Ray-Ray McCloud III",
-    "Scott Miller": "Scotty Miller",
-    "Pierre Strong": "Pierre Strong Jr.",
-    "A.J. Dillon": "AJ Dillon",
-    "Kenneth Walker": "Kenneth Walker III",
-    "Nathaniel Dell": "Tank Dell",
-    "Calvin Austin": "Calvin Austin III",
-    "Allen Robinson": "Allen Robinson II",
-    "Matt Slater": "Matthew Slater",
-    "Michael Pittman": "Michael Pittman Jr.",
-    "Mecole Hardman": "Mecole Hardman Jr.",
-    "Ty Montgomery": "Ty Montgomery II",
-    "John Metchie": "John Metchie III",
-    "Terrace Marshall": "Terrace Marshall Jr.",
-    "D.J. Chark": "DJ Chark Jr.",
-    "Laviska Shenault": "Laviska Shenault Jr.",
-    "Rod Williams": "Rodney Williams II",
-    "Andrew Ogletree": "Drew Ogletree",
-    "Irv Smith": "Irv Smith Jr.",
-    "Gardner Minshew": "Gardner Minshew II",
-    "Brian Robinson": "Brian Robinson Jr.",
-    "Chris Rodriguez": "Chris Rodriguez Jr.",
-    "Darrell Henderson": "Darrell Henderson Jr.",
-    "D.J. Moore": "DJ Moore",
-    "Velus Jones": "Velus Jones Jr.",
-    "Mitchell Trubisky": "Mitch Trubisky",
-    "Devon Achane": "De'Von Achane",
-}
-
-NFL_TO_DK_NAME = {
-    "Marvin Mims": "Marvin Mims Jr.",
-    "Richie James": "Richie James Jr.",
-    "Chigoziem Okonkwo": "Chig Okonkwo",
-    "Odell Beckham": "Odell Beckham Jr.",
-    "Josh Palmer": "Joshua Palmer",
-    "Donald Parham": "Donald Parham Jr.",
-    "Kavontae Turpin": "KaVontae Turpin",
-    "Travis Etienne": "Travis Etienne Jr.",
-    "Jamycal Hasty": "JaMycal Hasty",
-    "Lynn Bowden": "Lynn Bowden Jr.",
-    "Christopher Brooks": "Chris Brooks",
-    "Cedrick Wilson": "Cedrick Wilson Jr.",
-    "Robbie  Chosen": "Robbie Chosen",
-    "Jeffery Wilson": "Jeff Wilson Jr.",
-    "Ray-Ray McCloud": "Ray-Ray McCloud III",
-    "Scott Miller": "Scotty Miller",
-    "Pierre Strong": "Pierre Strong Jr.",
-    "A.J. Dillon": "AJ Dillon",
-    "Kenneth Walker": "Kenneth Walker III",
-    "Nathaniel Dell": "Tank Dell",
-    "Calvin Austin": "Calvin Austin III",
-    "Allen Robinson": "Allen Robinson II",
-    "Matt Slater": "Matthew Slater",
-    "Michael Pittman": "Michael Pittman Jr.",
-    "Mecole Hardman": "Mecole Hardman Jr.",
-    "Ty Montgomery": "Ty Montgomery II",
-    "John Metchie": "John Metchie III",
-    "Terrace Marshall": "Terrace Marshall Jr.",
-    "D.J. Chark": "DJ Chark Jr.",
-    "Laviska Shenault": "Laviska Shenault Jr.",
-    "Rod Williams": "Rodney Williams II",
-    "Andrew Ogletree": "Drew Ogletree",
-    "Irv Smith": "Irv Smith Jr.",
-    "Gardner Minshew": "Gardner Minshew II",
-    "Brian Robinson": "Brian Robinson Jr.",
-    "Chris Rodriguez": "Chris Rodriguez Jr.",
-    "Darrell Henderson": "Darrell Henderson Jr.",
-    "D.J. Moore": "DJ Moore",
-    "Velus Jones": "Velus Jones Jr.",
-    "Mitchell Trubisky": "Mitch Trubisky",
-    "Anthony McFarland": "Anthony McFarland Jr.",
-    "D'Wayne Eskridge": "Dee Eskridge",
-    "James Proche": "James Proche II",
-    "Devon Achane": "De'Von Achane",
-    "D.J. Turner": "DJ Turner",
-    "Austin Watkins": "Austin Watkins Jr.",
-}
-
-NFL_TO_ETR_NAME = {
-    "Kavontae Turpin": "KaVontae Turpin",
-    "Nathaniel Dell": "Tank Dell",
-    "Devon Achane": "De'Von Achane",
-    "Robbie  Chosen": "Robbie Chosen",
-    "Tommy DeVito": "Tommy Devito",
-    "DeVonta Smith": "Devonta Smith",
-}
 
 
 def add_is_home(dataset: pd.DataFrame) -> None:
@@ -994,7 +869,7 @@ def make_weather_df(full_pbp: pd.DataFrame) -> pd.DataFrame:
     )
     # parsed_weather_df.apply(is_stadium_dome, axis=1)
     parsed_weather_df["degrees_north"] = parsed_weather_df.apply(
-        get_stadium_orientation_degrees, axis=1   # type: ignore
+        get_stadium_orientation_degrees, axis=1  # type: ignore
     )
     parsed_weather_df["wind_direction_degrees"] = parsed_weather_df[
         "wind_direction"

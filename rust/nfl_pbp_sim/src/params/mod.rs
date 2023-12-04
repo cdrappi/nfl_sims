@@ -100,7 +100,9 @@ pub struct GameLoader {
 impl GameLoader {
     pub fn load(path: &String) -> Vec<GameLoader> {
         log::info!("loading games from {}", path);
-        let mut game_reader = Reader::from_path(format!("{}/Games-Table 1.csv", path)).unwrap();
+        let games_path = format!("{}/Games-Table 1.csv", path);
+        let mut game_reader = Reader::from_path(&games_path)
+            .expect(&format!("Failed to load file at {}", &games_path));
 
         let mut games = vec![];
         for game_csv in game_reader.deserialize() {
