@@ -7,6 +7,8 @@ use crate::util::stats::sample_beta;
 use csv::Reader;
 use serde::Deserialize;
 
+use super::Injury;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Deserialize)]
 pub enum Position {
     #[serde(rename = "QB")]
@@ -108,11 +110,15 @@ pub struct SkillPlayer {
     pub team: String,
     pub name: String,
     pub position: Position,
-    // pub injury: Injury,
-    // pub depth_chart: u8,
-    pub ms_carries: f32,
-    pub ms_targets: f32,
+    pub injury: Injury,
+    pub depth_chart: u8,
+    // init = before injuries
+    // live = updated after injuries
+    pub ms_carries_init: f32,
+    pub ms_carries_live: f32,
 
+    pub ms_targets_init: f32,
+    pub ms_targets_live: f32,
     pub prob_1ytg_given_carry: f32,
     // green zone = 10 yards or less from end zone
     pub prob_gz_given_carry: f32,
@@ -133,6 +139,7 @@ pub struct SkillPlayer {
     // misc ball carrying
     // TODO: fumble rate
     // pub fumble_rate: f32,
+    pub injury_mult: f32,
 }
 
 #[derive(Clone, Debug)]
@@ -142,7 +149,7 @@ pub struct SkillPlayerDistribution {
     pub name: String,
     pub position: Position,
     // pub injury: Injury,
-    // pub depth_chart: u8,
+    pub depth_chart: u8,
     pub ms_carries: MarketShare,
     pub ms_targets: MarketShare,
 
@@ -166,17 +173,24 @@ pub struct SkillPlayerDistribution {
     // misc ball carrying
     // TODO: fumble rate
     // pub fumble_rate: f32,
+    pub injury_mult: f32,
 }
 
 impl SkillPlayerDistribution {
     pub fn to_skill_player(&self) -> SkillPlayer {
+        let ms_carries_init = self.ms_carries.collapse();
+        let ms_targets_init = self.ms_targets.collapse();
         SkillPlayer {
             player_id: self.player_id.clone(),
             team: self.team.clone(),
             name: self.name.clone(),
             position: self.position,
-            ms_carries: self.ms_carries.collapse(),
-            ms_targets: self.ms_targets.collapse(),
+            depth_chart: self.depth_chart,
+            injury: Injury::Healthy,
+            ms_carries_init,
+            ms_carries_live: ms_carries_init,
+            ms_targets_init,
+            ms_targets_live: ms_targets_init,
             prob_1ytg_given_carry: self.prob_1ytg_given_carry,
             prob_gz_given_carry: self.prob_gz_given_carry,
             ryoe: self.ryoe,
@@ -187,6 +201,7 @@ impl SkillPlayerDistribution {
             prob_catch_oe: self.prob_catch_oe,
             xyac: self.xyac,
             yac_oe: self.yac_oe,
+            injury_mult: self.injury_mult,
         }
     }
 }
@@ -198,7 +213,7 @@ pub struct SkillPlayerLoader {
     pub name: String,
     pub pos: Position,
     // pub injury: Injury,
-    // pub depth_chart: u8,
+    pub depth_chart: u8,
     pub ms_carries: Option<f32>,
     pub msc_std: Option<f32>,
     pub ms_targets: Option<f32>,
@@ -224,6 +239,7 @@ pub struct SkillPlayerLoader {
     // misc ball carrying
     // TODO: fumble rate
     // pub fumble_rate: f32,
+    pub injury_mult: Option<f32>,
 }
 
 impl SkillPlayerLoader {
@@ -233,7 +249,7 @@ impl SkillPlayerLoader {
             team: self.team.clone(),
             name: self.name.clone(),
             position: self.pos.clone(),
-            // depth_chart: self.depth_chart,
+            depth_chart: self.depth_chart,
             ms_carries: MarketShare::new(self.ms_carries.unwrap_or(0.0), self.msc_std),
             ms_targets: MarketShare::new(self.ms_targets.unwrap_or(0.0), self.mst_std),
             prob_1ytg_given_carry: self.prob_1ytg_given_carry.unwrap_or(0.102),
@@ -246,6 +262,7 @@ impl SkillPlayerLoader {
             prob_catch_oe: self.prob_catch_oe.unwrap_or(0.0),
             xyac: self.xyac.unwrap_or(5.5),
             yac_oe: self.yac_oe.unwrap_or(0.0),
+            injury_mult: self.injury_mult.unwrap_or(1.0),
         }
     }
 }

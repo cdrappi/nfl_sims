@@ -153,7 +153,7 @@ impl RushingModel {
         let mut cumsum = 0.0;
 
         for (id, rusher) in offense.skill_players.iter() {
-            let marginal_share = rusher.ms_carries;
+            let marginal_share = rusher.ms_carries_live;
             let loc_adj = match situation {
                 RushingSituation::OneYardToGo => rusher.prob_1ytg_given_carry,
                 RushingSituation::GreenZone => rusher.prob_gz_given_carry,

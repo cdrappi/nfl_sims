@@ -464,7 +464,7 @@ impl TargetModel {
         let offense = sim.offense_params();
         let mut cumsum = 0.0;
         for (pid, player) in offense.skill_players.iter() {
-            let marginal_share = player.ms_targets;
+            let marginal_share = player.ms_targets_live;
             let (rz_adj, loc_prior) = match yards_to_goal <= 20 {
                 true => (player.prob_rz_given_target, PROB_RZ_TARGET),
                 false => (1.0 - player.prob_rz_given_target, 1.0 - PROB_RZ_TARGET),

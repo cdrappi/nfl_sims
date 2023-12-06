@@ -1,6 +1,8 @@
 pub mod box_score;
 pub mod play_result;
 
+use std::collections::HashMap;
+
 use crate::{
     game_loop::{
         field_goals::FG_SNAP_DISTANCE,
@@ -21,7 +23,9 @@ use crate::{
         rushing::RushingModel,
         two_point_attempt::TwoPointAttemptModel,
     },
-    params::{GameParams, GameParamsDistribution, TeamParams},
+    params::{
+        skill_player::Position, team, GameParams, GameParamsDistribution, Injury, TeamParams,
+    },
     start::{GameStart, HomeAway},
     state::{
         clock::Quarter,
@@ -116,12 +120,25 @@ impl GameSim {
         }
     }
 
+    /// given a set of injury statuses, edit live market shares
+    pub fn apply_injuries(&mut self) {
+        let team_params = match self.game_state.play.possession() {
+            HomeAway::Home => &mut self.game_params.home,
+            HomeAway::Away => &mut self.game_params.away,
+        };
+        team_params.apply_injuries();
+    }
+
     pub fn next_play(&mut self) -> (PlayResult, u16, ClockStatus, bool) {
         log::debug!("{}", self);
         self.register_down();
         let play_call = choose_playcall(&self);
         let result: PlayResult = self.play_result(&play_call);
         log::debug!("{}\n", result);
+        let injuries = Injury::sim_injuries(&result, self.offense_params());
+        self.game_params
+            .update_injuries(self.game_state.play.possession(), injuries);
+        self.apply_injuries();
 
         // add stats to the box score
         self.box_score.apply_stats(&result, &self.game_state.play);

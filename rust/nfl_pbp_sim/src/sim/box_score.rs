@@ -45,7 +45,7 @@ impl PlayerFantasyPoints {
         let n = n_sims as f32;
 
         self.draftkings += points.draftkings / n;
-        self.fanduel += points.fanduel;
+        self.fanduel += points.fanduel / n;
         self.full_ppr += points.full_ppr / n;
         self.half_ppr += points.half_ppr / n;
         self.standard += points.standard / n;

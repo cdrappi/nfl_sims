@@ -2,21 +2,20 @@ pub mod quarterback;
 pub mod skill_player;
 pub mod team;
 pub mod weather;
-use csv::Reader;
 
+use csv::Reader;
+use serde::Deserialize;
 use std::collections::HashMap;
 
-use crate::sim::box_score::SalaryKey;
-use crate::start::HomeAway;
-use crate::state::clock::Quarter;
-
+use crate::params::skill_player::{Position, SkillPlayerDistribution};
+use crate::params::weather::StadiumType;
 use crate::params::{
     quarterback::Quarterback, skill_player::SkillPlayer, team::Team, weather::Weather,
 };
-
-use self::skill_player::{Position, SkillPlayerDistribution};
-use self::weather::StadiumType;
-use serde::Deserialize;
+use crate::sim::box_score::SalaryKey;
+use crate::sim::play_result::{DropbackOutcome, PlayResult, RushingOutcome, TargetOutcome};
+use crate::start::HomeAway;
+use crate::util::stats::random_bool;
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct PlayerMeta {
@@ -26,11 +25,121 @@ pub struct PlayerMeta {
     pub opp: String,
 }
 
-#[derive(Clone, Hash, PartialEq, serde::Serialize)]
+#[derive(Clone, Hash, PartialEq, serde::Serialize, Debug)]
 pub enum Injury {
     Healthy,
     // if injured, when will they return?
-    Injured(Quarter),
+    // default assume out for game
+    Injured,
+}
+
+// Carries
+pub const SKILL_RUSH_YARDS_INJURY_PROB: f32 = 0.00_25;
+// (they'll slide)
+pub const QB_CARRY_INJURY_PROB: f32 = 0.00_25;
+// really shouldn't be possible...
+pub const SKILL_RUSH_TD_INJURY_PROB: f32 = 0.00_01;
+// should be more likely than normal yards
+pub const SKILL_RUSH_SAFETY_INJURY_PROB: f32 = 2.0 * SKILL_RUSH_YARDS_INJURY_PROB;
+// should be MUCH more likely than normal yards
+pub const SKILL_RUSH_FUMLOST_INJURY_PROB: f32 = 10.0 * SKILL_RUSH_YARDS_INJURY_PROB;
+
+// dropbacks for QBs
+pub const QB_SCRAMBLE_INJURY_PROB: f32 = 0.00_50;
+pub const QB_SACKED_INJURY_PROB: f32 = 0.01;
+pub const QB_THROW_INJURY_PROB: f32 = 0.00_01;
+
+// targets for skill
+pub const SKILL_CATCH_YARDS_INJURY_PROB: f32 = 0.00_25;
+pub const SKILL_CATCH_TD_INJURY_PROB: f32 = 0.00_01;
+pub const SKILL_INCOMPLETE_INJURY_PROB: f32 = 0.00_10;
+pub const SKILL_INT_INJURY_PROB: f32 = 0.00_05;
+pub const SKILL_CATCH_FUMBLE_INJURY_PROB: f32 = 0.01;
+
+impl Injury {
+    /// returns hashmap of players who have a different injury status than before the play
+    /// for now, just means a list of guys who got injured    
+    pub fn sim_injuries(
+        play_result: &PlayResult,
+        team_params: &TeamParams,
+    ) -> HashMap<Position, HashMap<(u8, String), Injury>> {
+        let mut injuries = HashMap::new();
+        let player_probs = match play_result {
+            PlayResult::Dropback(dropback) => {
+                let qb_depth = match &dropback.passer_id == &team_params.qbs[0].player_id {
+                    true => 1,
+                    false => 2,
+                };
+                let qb_param = &team_params.skill_players[&dropback.passer_id];
+                let qb_injury_mult = match qb_depth == 1 {
+                    true => qb_param.injury_mult,
+                    // assume backup qbs cannot get injured
+                    false => 0.0,
+                };
+                let qb_key = (Position::Quarterback, qb_depth, &dropback.passer_id);
+                match &dropback.outcome {
+                    DropbackOutcome::QbScramble(_) => {
+                        vec![(qb_key, QB_SCRAMBLE_INJURY_PROB * qb_injury_mult)]
+                    }
+                    DropbackOutcome::Sack(_) => {
+                        vec![(qb_key, QB_SACKED_INJURY_PROB * qb_injury_mult)]
+                    }
+                    DropbackOutcome::Target(tgt) => {
+                        let tgted_param = &team_params.skill_players[&tgt.targeted_receiver_id];
+                        let tgt_injury_mult = tgted_param.injury_mult;
+                        let tgt_key = (
+                            tgted_param.position,
+                            tgted_param.depth_chart,
+                            &tgt.targeted_receiver_id,
+                        );
+                        let outcome_prob = match tgt.outcome {
+                            TargetOutcome::Yards(_, _) => SKILL_CATCH_YARDS_INJURY_PROB,
+                            TargetOutcome::Touchdown(_) => SKILL_CATCH_TD_INJURY_PROB,
+                            TargetOutcome::Incomplete(_) => SKILL_INCOMPLETE_INJURY_PROB,
+                            TargetOutcome::Interception(_, _) => SKILL_INT_INJURY_PROB,
+                            TargetOutcome::CatchThenFumble(_, _) => SKILL_CATCH_FUMBLE_INJURY_PROB,
+                        };
+                        vec![
+                            (qb_key, qb_injury_mult * QB_THROW_INJURY_PROB),
+                            (tgt_key, tgt_injury_mult * outcome_prob),
+                        ]
+                    }
+                    DropbackOutcome::Throwaway => {
+                        vec![(qb_key, qb_injury_mult * QB_THROW_INJURY_PROB)]
+                    }
+                    // no injury possible
+                    DropbackOutcome::QbSpike => vec![],
+                }
+            }
+            PlayResult::DesignedRun(run) => {
+                let rusher_param = &team_params.skill_players[&run.carrier_id];
+                let rusher_key = (
+                    rusher_param.position,
+                    rusher_param.depth_chart,
+                    &run.carrier_id,
+                );
+                let rusher_injury_mult = rusher_param.injury_mult;
+                let outcome_prob = match run.outcome {
+                    RushingOutcome::Yards(_, _) => SKILL_RUSH_YARDS_INJURY_PROB,
+                    RushingOutcome::Touchdown => SKILL_RUSH_TD_INJURY_PROB,
+                    RushingOutcome::FumbleLost(_, _) => SKILL_RUSH_FUMLOST_INJURY_PROB,
+                    RushingOutcome::Safety => SKILL_RUSH_SAFETY_INJURY_PROB,
+                };
+                vec![(rusher_key, rusher_injury_mult * outcome_prob)]
+            }
+            _ => vec![],
+        };
+        for ((pos, depth, player_id), injury_prob) in player_probs {
+            if random_bool(injury_prob) {
+                if !injuries.contains_key(&pos) {
+                    injuries.insert(pos, HashMap::new());
+                }
+                let pos_injuries = injuries.get_mut(&pos).unwrap();
+                pos_injuries.insert((depth, player_id.clone()), Injury::Injured);
+            }
+        }
+        injuries
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -50,7 +159,39 @@ impl TeamParamsDistribution {
                 .iter()
                 .map(|(k, v)| (k.clone(), v.to_skill_player()))
                 .collect(),
+            injuries: HashMap::new(),
         }
+    }
+}
+
+impl TeamParams {
+    pub fn update_injuries(&mut self, injuries: HashMap<Position, HashMap<(u8, String), Injury>>) {
+        let inj_state = &mut self.injuries;
+        for (pos, pos_injuries) in injuries {
+            if !inj_state.contains_key(&pos) {
+                inj_state.insert(pos, HashMap::new());
+            }
+            let pos_inj_state = inj_state.get_mut(&pos).unwrap();
+            for (key, injury) in pos_injuries {
+                pos_inj_state.insert(key, injury);
+            }
+        }
+    }
+
+    pub fn apply_injuries(&mut self) {
+        for (pos, pos_injuries) in self.injuries.clone() {
+            self.apply_pos_injuries(pos.clone(), pos_injuries);
+        }
+    }
+
+    pub fn apply_pos_injuries(&mut self, pos: Position, injuries: HashMap<(u8, String), Injury>) {
+        let pos_players: Vec<&SkillPlayer> = self
+            .skill_players
+            .iter()
+            .map(|(_, param)| param)
+            .filter(|param| param.position == pos)
+            .collect();
+        // calculate type of depth chart & edit market shares
     }
 }
 
@@ -59,6 +200,7 @@ pub struct TeamParams {
     pub team: Team,
     pub qbs: Vec<Quarterback>,
     pub skill_players: HashMap<String, SkillPlayer>,
+    pub injuries: HashMap<Position, HashMap<(u8, String), Injury>>,
 }
 
 #[derive(Clone, Debug)]
@@ -119,6 +261,17 @@ impl GameParams {
         match team {
             HomeAway::Home => &self.home,
             HomeAway::Away => &self.away,
+        }
+    }
+
+    pub fn update_injuries(
+        &mut self,
+        home_away: HomeAway,
+        injuries: HashMap<Position, HashMap<(u8, String), Injury>>,
+    ) {
+        match home_away {
+            HomeAway::Home => self.home.update_injuries(injuries),
+            HomeAway::Away => self.away.update_injuries(injuries),
         }
     }
 
