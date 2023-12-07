@@ -182,16 +182,18 @@ impl TeamParams {
         }
     }
 
-    pub fn depth_type(depth_charts: Vec<u8>) -> DepthType {
+    pub fn depth_type(pos: Position, depth_charts: Vec<u8>) -> DepthType {
         let num_depth_1 = depth_charts
             .iter()
             .filter(|depth| **depth == 1)
             .map(|_| 1)
             .sum();
         match num_depth_1 {
+            0 => panic!("no starters for {:?}", pos),
             1 => DepthType::OneStarter,
             2 => DepthType::TwoStarters,
-            _ => DepthType::ThreeStarters,
+            3 => DepthType::ThreeStarters,
+            _ => panic!("too many ({}) starters for {:?}", num_depth_1, pos),
         }
     }
 
@@ -204,7 +206,7 @@ impl TeamParams {
             .collect();
 
         let all_depth_charts = SkillPlayer::depth_charts(&pos_players);
-        let depth_type = TeamParams::depth_type(all_depth_charts);
+        let depth_type = TeamParams::depth_type(pos, all_depth_charts);
         // calculate type of depth chart & edit market shares
         let injured_players = pos_players
             .iter()
