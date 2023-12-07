@@ -178,26 +178,63 @@ impl TeamParams {
 
     pub fn apply_injuries(&mut self) {
         for (pos, pos_injuries) in self.injuries.clone() {
-            self.apply_pos_injuries(pos.clone(), pos_injuries);
+            self.apply_pos_injuries(pos.clone(), pos_injuries, self.team.team.clone());
         }
     }
 
-    pub fn depth_type(pos: Position, depth_charts: Vec<u8>) -> DepthType {
+    pub fn depth_type(depth_charts: Vec<u8>, team_pos: String) -> DepthType {
         let num_depth_1 = depth_charts
             .iter()
             .filter(|depth| **depth == 1)
             .map(|_| 1)
             .sum();
         match num_depth_1 {
-            0 => panic!("no starters for {:?}", pos),
+            0 => panic!("no starters for {}", team_pos),
             1 => DepthType::OneStarter,
             2 => DepthType::TwoStarters,
             3 => DepthType::ThreeStarters,
-            _ => panic!("too many ({}) starters for {:?}", num_depth_1, pos),
+            _ => panic!("too many ({}) starters for {}", num_depth_1, team_pos),
         }
     }
 
-    pub fn apply_pos_injuries(&mut self, pos: Position, injuries: HashMap<String, Injury>) {
+    /*
+    Injury logic
+
+    1 RB:
+    - RB1 injured: RB1 gets 1/3, split remaining 3/4 pro rata
+    - RB2 injured: RB1 gets 1/5, RB2-3 get 4/5 pro rata
+    - RB3 injured: RB1 gets 1/10, split remaining 9/10 pro rata
+
+    2 RB:
+    - RB1 injured: RB1 gets 1/4, Of 3/4 remaining, split evenly pro rata
+    - RB2 injured: RB1s gets 1/3 each, split 1/3 to RB3-4
+    - RB3 injured: RB1s 1/4 + RB2 1/4 + rest get 1/4 combined
+
+    Pass catching
+
+    1 WR1 on depth chart
+    - WR1 injured. split evenly to remaining pro rata. everyone multiple = 1
+    - WR2 injured. WR1 1/10, split rest evenly
+    - WR3+ injured. WR1 no change, split rest evenly
+
+    2 WR1s
+    - WR1 injured. 1/5 WR1, 2/5 WR2, 2/5 rest
+    - WR2 injured. 1/10 WR1s, 1/2 WR2, rest evenly
+    - WR3 injured. WR1s no change, rest split evenly
+    - WR4 injured. WR1s no change, rest split evenly
+
+    3 WR1s
+    - WR1 injured. 1/10 WR1s, 2/5 WR2, 1/5 WR3, rest evenly
+    - WR2 injured. 1/10 WR1s, rest evenly
+    - WR3 injured. WR1s no change, rest evenly
+     */
+
+    pub fn apply_pos_injuries(
+        &mut self,
+        pos: Position,
+        injuries: HashMap<String, Injury>,
+        team: String,
+    ) {
         let pos_players: Vec<&SkillPlayer> = self
             .skill_players
             .iter()
@@ -206,7 +243,7 @@ impl TeamParams {
             .collect();
 
         let all_depth_charts = SkillPlayer::depth_charts(&pos_players);
-        let depth_type = TeamParams::depth_type(pos, all_depth_charts);
+        let depth_type = TeamParams::depth_type(all_depth_charts, format!("{} {:?}", team, pos));
         // calculate type of depth chart & edit market shares
         let injured_players = pos_players
             .iter()
