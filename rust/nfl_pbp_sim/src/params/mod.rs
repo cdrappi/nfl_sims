@@ -156,10 +156,19 @@ impl TeamParamsDistribution {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
 pub enum DepthType {
     OneStarter,
     TwoStarters,
     ThreeStarters,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum InjuredDepthType {
+    Starter,
+    SecondString,
+    ThirdString,
+    Benchwarmer,
 }
 
 impl TeamParams {
@@ -182,7 +191,7 @@ impl TeamParams {
         }
     }
 
-    pub fn depth_type(depth_charts: Vec<u8>, team_pos: String) -> DepthType {
+    pub fn depth_type(depth_charts: Vec<u8>, team_pos: &String) -> DepthType {
         let num_depth_1 = depth_charts
             .iter()
             .filter(|depth| **depth == 1)
@@ -197,9 +206,35 @@ impl TeamParams {
         }
     }
 
-    /*
-    Injury logic
+    pub fn injured_depth_type(depth_charts: &Vec<u8>) -> InjuredDepthType {
+        let num_depth_1: u8 = depth_charts
+            .iter()
+            .filter(|depth| **depth == 1)
+            .map(|_| 1)
+            .sum();
+        let num_depth_2: u8 = depth_charts
+            .iter()
+            .filter(|depth| **depth == 2)
+            .map(|_| 1)
+            .sum();
+        let num_depth_3: u8 = depth_charts
+            .iter()
+            .filter(|depth| **depth == 3)
+            .map(|_| 1)
+            .sum();
+        if num_depth_1 > 0 {
+            return InjuredDepthType::Starter;
+        }
+        if num_depth_2 > 0 {
+            return InjuredDepthType::SecondString;
+        }
+        if num_depth_3 > 0 {
+            return InjuredDepthType::ThirdString;
+        }
+        return InjuredDepthType::Benchwarmer;
+    }
 
+    /*
     1 RB:
     - RB1 injured: RB1 gets 1/3, split remaining 3/4 pro rata
     - RB2 injured: RB1 gets 1/5, RB2-3 get 4/5 pro rata
@@ -209,9 +244,20 @@ impl TeamParams {
     - RB1 injured: RB1 gets 1/4, Of 3/4 remaining, split evenly pro rata
     - RB2 injured: RB1s gets 1/3 each, split 1/3 to RB3-4
     - RB3 injured: RB1s 1/4 + RB2 1/4 + rest get 1/4 combined
+    */
+    fn get_extra_ms_carries(
+        injured_ms_carries: f32,
+        non_injured_players: &Vec<&SkillPlayer>,
+        depth_type: DepthType,
+        injured_depth_type: InjuredDepthType,
+    ) -> HashMap<String, f32> {
+        let mut extra_ms_carries = HashMap::new();
 
+        extra_ms_carries
+    }
+
+    /*
     Pass catching
-
     1 WR1 on depth chart
     - WR1 injured. split evenly to remaining pro rata. everyone multiple = 1
     - WR2 injured. WR1 1/10, split rest evenly
@@ -227,7 +273,17 @@ impl TeamParams {
     - WR1 injured. 1/10 WR1s, 2/5 WR2, 1/5 WR3, rest evenly
     - WR2 injured. 1/10 WR1s, rest evenly
     - WR3 injured. WR1s no change, rest evenly
-     */
+    */
+    fn get_extra_ms_targets(
+        injured_ms_targets: f32,
+        non_injured_players: &Vec<&SkillPlayer>,
+        depth_type: DepthType,
+        injured_depth_type: InjuredDepthType,
+    ) -> HashMap<String, f32> {
+        let mut extra_ms_targets = HashMap::new();
+
+        extra_ms_targets
+    }
 
     pub fn apply_pos_injuries(
         &mut self,
@@ -243,21 +299,46 @@ impl TeamParams {
             .collect();
 
         let all_depth_charts = SkillPlayer::depth_charts(&pos_players);
-        let depth_type = TeamParams::depth_type(all_depth_charts, format!("{} {:?}", team, pos));
+        let team_pos = format!("{} {:?}", team, pos);
+        let depth_type = TeamParams::depth_type(all_depth_charts, &team_pos);
         // calculate type of depth chart & edit market shares
         let injured_players = pos_players
             .iter()
             .cloned()
             .filter(|p| injuries.contains_key(&p.player_id))
             .collect();
+        let injured_depth_charts = SkillPlayer::depth_charts(&injured_players);
         let non_injured_players: Vec<&SkillPlayer> = pos_players
             .iter()
             .cloned()
             .filter(|p| !injuries.contains_key(&p.player_id))
             .collect();
-        let injured_depth_charts = SkillPlayer::depth_charts(&injured_players);
+        let injured_depth_type = TeamParams::injured_depth_type(&injured_depth_charts);
         let injured_ms_carries: f32 = injured_players.iter().map(|p| p.ms_carries_init).sum();
+        let extra_ms_carries = TeamParams::get_extra_ms_carries(
+            injured_ms_carries,
+            &non_injured_players,
+            depth_type,
+            injured_depth_type,
+        );
         let injured_ms_targets: f32 = injured_players.iter().map(|p| p.ms_targets_init).sum();
+        let extra_ms_targets = TeamParams::get_extra_ms_targets(
+            injured_ms_targets,
+            &non_injured_players,
+            depth_type,
+            injured_depth_type,
+        );
+        for (player_id, skill_player) in self.skill_players.iter_mut() {
+            if injuries.contains_key(player_id) {
+                skill_player.ms_carries_live = 0.0;
+                skill_player.ms_targets_live = 0.0;
+            } else {
+                skill_player.ms_carries_live =
+                    skill_player.ms_carries_init + *extra_ms_carries.get(player_id).unwrap_or(&0.0);
+                skill_player.ms_targets_live =
+                    skill_player.ms_targets_init + *extra_ms_targets.get(player_id).unwrap_or(&0.0);
+            }
+        }
     }
 }
 
