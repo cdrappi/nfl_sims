@@ -234,17 +234,6 @@ impl TeamParams {
         return InjuredDepthType::Benchwarmer;
     }
 
-    /*
-    1 RB:
-    - RB1 injured: RB1 gets 1/3, split remaining 3/4 pro rata
-    - RB2 injured: RB1 gets 1/5, RB2-3 get 4/5 pro rata
-    - RB3 injured: RB1 gets 1/10, split remaining 9/10 pro rata
-
-    2 RB:
-    - RB1 injured: RB1 gets 1/4, Of 3/4 remaining, split evenly pro rata
-    - RB2 injured: RB1s gets 1/3 each, split 1/3 to RB3-4
-    - RB3 injured: RB1s 1/4 + RB2 1/4 + rest get 1/4 combined
-    */
     fn get_extra_ms_carries(
         injured_ms_carries: f32,
         non_injured_players: &Vec<&SkillPlayer>,
@@ -253,27 +242,59 @@ impl TeamParams {
     ) -> HashMap<String, f32> {
         let mut extra_ms_carries = HashMap::new();
 
+        for skill_player in non_injured_players {
+            let mult = match depth_type {
+                /*
+                1 RB:
+                - RB1 injured: RB1 gets 1/3, split remaining 3/4 pro rata
+                - RB2 injured: RB1 gets 1/5, RB2-3 get 4/5 pro rata
+                - RB3 injured: RB1 gets 1/10, split remaining 9/10 pro rata
+                */
+                DepthType::OneStarter => match injured_depth_type {
+                    InjuredDepthType::Starter => 1.0,
+                    InjuredDepthType::SecondString => 1.0,
+                    InjuredDepthType::ThirdString => 1.0,
+                    InjuredDepthType::Benchwarmer => 1.0,
+                },
+                /*
+                2 RB:
+                    - RB1 injured: RB1 gets 1/4, Of 3/4 remaining, split evenly pro rata
+                    - RB2 injured: RB1s gets 1/3 each, split 1/3 to RB3-4
+                    - RB3 injured: RB1s 1/4 + RB2 1/4 + rest get 1/4 combined
+                */
+                DepthType::TwoStarters => match injured_depth_type {
+                    InjuredDepthType::Starter => 1.0,
+                    InjuredDepthType::SecondString => 1.0,
+                    InjuredDepthType::ThirdString => 1.0,
+                    InjuredDepthType::Benchwarmer => 1.0,
+                },
+                /*
+                3 WR1s
+                    - WR1 injured. 1/10 WR1s, 2/5 WR2, 1/5 WR3, rest evenly
+                    - WR2 injured. 1/10 WR1s, rest evenly
+                    - WR3 injured. WR1s no change, rest evenly
+                */
+                DepthType::ThreeStarters => match injured_depth_type {
+                    InjuredDepthType::Starter => 1.0,
+                    InjuredDepthType::SecondString => 1.0,
+                    InjuredDepthType::ThirdString => 1.0,
+                    InjuredDepthType::Benchwarmer => 1.0,
+                },
+            };
+
+            extra_ms_carries.insert(
+                skill_player.player_id.clone(),
+                skill_player.ms_carries_init * mult,
+            );
+        }
+
+        let extra_sum: f32 = extra_ms_carries.values().sum();
+        for (_, v) in extra_ms_carries.iter_mut() {
+            *v *= injured_ms_carries / extra_sum;
+        }
         extra_ms_carries
     }
 
-    /*
-    Pass catching
-    1 WR1 on depth chart
-    - WR1 injured. split evenly to remaining pro rata. everyone multiple = 1
-    - WR2 injured. WR1 1/10, split rest evenly
-    - WR3+ injured. WR1 no change, split rest evenly
-
-    2 WR1s
-    - WR1 injured. 1/5 WR1, 2/5 WR2, 2/5 rest
-    - WR2 injured. 1/10 WR1s, 1/2 WR2, rest evenly
-    - WR3 injured. WR1s no change, rest split evenly
-    - WR4 injured. WR1s no change, rest split evenly
-
-    3 WR1s
-    - WR1 injured. 1/10 WR1s, 2/5 WR2, 1/5 WR3, rest evenly
-    - WR2 injured. 1/10 WR1s, rest evenly
-    - WR3 injured. WR1s no change, rest evenly
-    */
     fn get_extra_ms_targets(
         injured_ms_targets: f32,
         non_injured_players: &Vec<&SkillPlayer>,
@@ -282,6 +303,56 @@ impl TeamParams {
     ) -> HashMap<String, f32> {
         let mut extra_ms_targets = HashMap::new();
 
+        for skill_player in non_injured_players {
+            let mult = match depth_type {
+                /*
+                1 WR1 on depth chart
+                    - WR1 injured. split evenly to remaining pro rata. everyone multiple = 1
+                    - WR2 injured. WR1 1/10, split rest evenly
+                    - WR3+ injured. WR1 no change, split rest evenly
+                */
+                DepthType::OneStarter => match injured_depth_type {
+                    InjuredDepthType::Starter => 1.0,
+                    InjuredDepthType::SecondString => 1.0,
+                    InjuredDepthType::ThirdString => 1.0,
+                    InjuredDepthType::Benchwarmer => 1.0,
+                },
+                /*
+                2 WR1s
+                - WR1 injured. 1/5 WR1, 2/5 WR2, 2/5 rest
+                - WR2 injured. 1/10 WR1s, 1/2 WR2, rest evenly
+                - WR3 injured. WR1s no change, rest split evenly
+                - WR4 injured. WR1s no change, rest split evenly
+                */
+                DepthType::TwoStarters => match injured_depth_type {
+                    InjuredDepthType::Starter => 1.0,
+                    InjuredDepthType::SecondString => 1.0,
+                    InjuredDepthType::ThirdString => 1.0,
+                    InjuredDepthType::Benchwarmer => 1.0,
+                },
+                /*
+                3 WR1s
+                    - WR1 injured. 1/10 WR1s, 2/5 WR2, 1/5 WR3, rest evenly
+                    - WR2 injured. 1/10 WR1s, rest evenly
+                    - WR3 injured. WR1s no change, rest evenly
+                */
+                DepthType::ThreeStarters => match injured_depth_type {
+                    InjuredDepthType::Starter => 1.0,
+                    InjuredDepthType::SecondString => 1.0,
+                    InjuredDepthType::ThirdString => 1.0,
+                    InjuredDepthType::Benchwarmer => 1.0,
+                },
+            };
+            extra_ms_targets.insert(
+                skill_player.player_id.clone(),
+                skill_player.ms_targets_init * mult,
+            );
+        }
+
+        let extra_sum: f32 = extra_ms_targets.values().sum();
+        for (_, v) in extra_ms_targets.iter_mut() {
+            *v *= injured_ms_targets / extra_sum;
+        }
         extra_ms_targets
     }
 
