@@ -62,7 +62,7 @@ impl Injury {
     pub fn sim_injuries(
         play_result: &PlayResult,
         team_params: &TeamParams,
-    ) -> HashMap<Position, HashMap<(u8, String), Injury>> {
+    ) -> HashMap<Position, HashMap<String, Injury>> {
         let mut injuries = HashMap::new();
         let player_probs = match play_result {
             PlayResult::Dropback(dropback) => {
@@ -76,7 +76,7 @@ impl Injury {
                     // assume backup qbs cannot get injured
                     false => 0.0,
                 };
-                let qb_key = (Position::Quarterback, qb_depth, &dropback.passer_id);
+                let qb_key = (Position::Quarterback, &dropback.passer_id);
                 match &dropback.outcome {
                     DropbackOutcome::QbScramble(_) => {
                         vec![(qb_key, QB_SCRAMBLE_INJURY_PROB * qb_injury_mult)]
@@ -87,11 +87,7 @@ impl Injury {
                     DropbackOutcome::Target(tgt) => {
                         let tgted_param = &team_params.skill_players[&tgt.targeted_receiver_id];
                         let tgt_injury_mult = tgted_param.injury_mult;
-                        let tgt_key = (
-                            tgted_param.position,
-                            tgted_param.depth_chart,
-                            &tgt.targeted_receiver_id,
-                        );
+                        let tgt_key = (tgted_param.position, &tgt.targeted_receiver_id);
                         let outcome_prob = match tgt.outcome {
                             TargetOutcome::Yards(_, _) => SKILL_CATCH_YARDS_INJURY_PROB,
                             TargetOutcome::Touchdown(_) => SKILL_CATCH_TD_INJURY_PROB,
@@ -113,11 +109,7 @@ impl Injury {
             }
             PlayResult::DesignedRun(run) => {
                 let rusher_param = &team_params.skill_players[&run.carrier_id];
-                let rusher_key = (
-                    rusher_param.position,
-                    rusher_param.depth_chart,
-                    &run.carrier_id,
-                );
+                let rusher_key = (rusher_param.position, &run.carrier_id);
                 let rusher_injury_mult = rusher_param.injury_mult;
                 let outcome_prob = match run.outcome {
                     RushingOutcome::Yards(_, _) => SKILL_RUSH_YARDS_INJURY_PROB,
@@ -129,13 +121,13 @@ impl Injury {
             }
             _ => vec![],
         };
-        for ((pos, depth, player_id), injury_prob) in player_probs {
+        for ((pos, player_id), injury_prob) in player_probs {
             if random_bool(injury_prob) {
                 if !injuries.contains_key(&pos) {
                     injuries.insert(pos, HashMap::new());
                 }
                 let pos_injuries = injuries.get_mut(&pos).unwrap();
-                pos_injuries.insert((depth, player_id.clone()), Injury::Injured);
+                pos_injuries.insert(player_id.clone(), Injury::Injured);
             }
         }
         injuries
@@ -164,8 +156,14 @@ impl TeamParamsDistribution {
     }
 }
 
+pub enum DepthType {
+    OneStarter,
+    TwoStarters,
+    ThreeStarters,
+}
+
 impl TeamParams {
-    pub fn update_injuries(&mut self, injuries: HashMap<Position, HashMap<(u8, String), Injury>>) {
+    pub fn update_injuries(&mut self, injuries: HashMap<Position, HashMap<String, Injury>>) {
         let inj_state = &mut self.injuries;
         for (pos, pos_injuries) in injuries {
             if !inj_state.contains_key(&pos) {
@@ -184,14 +182,43 @@ impl TeamParams {
         }
     }
 
-    pub fn apply_pos_injuries(&mut self, pos: Position, injuries: HashMap<(u8, String), Injury>) {
+    pub fn depth_type(depth_charts: Vec<u8>) -> DepthType {
+        let num_depth_1 = depth_charts
+            .iter()
+            .filter(|depth| **depth == 1)
+            .map(|_| 1)
+            .sum();
+        match num_depth_1 {
+            1 => DepthType::OneStarter,
+            2 => DepthType::TwoStarters,
+            _ => DepthType::ThreeStarters,
+        }
+    }
+
+    pub fn apply_pos_injuries(&mut self, pos: Position, injuries: HashMap<String, Injury>) {
         let pos_players: Vec<&SkillPlayer> = self
             .skill_players
             .iter()
             .map(|(_, param)| param)
             .filter(|param| param.position == pos)
             .collect();
+
+        let all_depth_charts = SkillPlayer::depth_charts(&pos_players);
+        let depth_type = TeamParams::depth_type(all_depth_charts);
         // calculate type of depth chart & edit market shares
+        let injured_players = pos_players
+            .iter()
+            .cloned()
+            .filter(|p| injuries.contains_key(&p.player_id))
+            .collect();
+        let non_injured_players: Vec<&SkillPlayer> = pos_players
+            .iter()
+            .cloned()
+            .filter(|p| !injuries.contains_key(&p.player_id))
+            .collect();
+        let injured_depth_charts = SkillPlayer::depth_charts(&injured_players);
+        let injured_ms_carries: f32 = injured_players.iter().map(|p| p.ms_carries_init).sum();
+        let injured_ms_targets: f32 = injured_players.iter().map(|p| p.ms_targets_init).sum();
     }
 }
 
@@ -200,7 +227,7 @@ pub struct TeamParams {
     pub team: Team,
     pub qbs: Vec<Quarterback>,
     pub skill_players: HashMap<String, SkillPlayer>,
-    pub injuries: HashMap<Position, HashMap<(u8, String), Injury>>,
+    pub injuries: HashMap<Position, HashMap<String, Injury>>,
 }
 
 #[derive(Clone, Debug)]
@@ -267,7 +294,7 @@ impl GameParams {
     pub fn update_injuries(
         &mut self,
         home_away: HomeAway,
-        injuries: HashMap<Position, HashMap<(u8, String), Injury>>,
+        injuries: HashMap<Position, HashMap<String, Injury>>,
     ) {
         match home_away {
             HomeAway::Home => self.home.update_injuries(injuries),

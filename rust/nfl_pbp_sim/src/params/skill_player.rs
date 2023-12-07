@@ -275,6 +275,12 @@ impl SkillPlayer {
         }
     }
 
+    pub fn depth_charts(skill_players: &Vec<&SkillPlayer>) -> Vec<u8> {
+        let mut depth_charts: Vec<u8> = skill_players.iter().map(|sp| sp.depth_chart).collect();
+        depth_charts.sort();
+        depth_charts
+    }
+
     pub fn load(path: &String) -> HashMap<String, HashMap<String, SkillPlayerDistribution>> {
         let mut sp_reader = Reader::from_path(format!("{}/Skill-Table 1.csv", path)).unwrap();
 
