@@ -4,6 +4,7 @@ pub mod team;
 pub mod weather;
 
 use csv::Reader;
+use lazy_static::lazy_static;
 use serde::Deserialize;
 use std::collections::HashMap;
 
@@ -16,6 +17,18 @@ use crate::sim::box_score::SalaryKey;
 use crate::sim::play_result::{DropbackOutcome, PlayResult, RushingOutcome, TargetOutcome};
 use crate::start::HomeAway;
 use crate::util::stats::random_bool;
+
+lazy_static! {
+    static ref MAX_INJURIES_PER_POS: HashMap<Position, u8> = {
+        let mut m = HashMap::new();
+        m.insert(Position::Quarterback, 1);
+        m.insert(Position::Halfback, 2);
+        m.insert(Position::Fullback, 1);
+        m.insert(Position::WideReceiver, 3);
+        m.insert(Position::TightEnd, 2);
+        m
+    };
+}
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct PlayerMeta {
@@ -66,12 +79,8 @@ impl Injury {
         let mut injuries = HashMap::new();
         let player_probs = match play_result {
             PlayResult::Dropback(dropback) => {
-                let qb_depth = match &dropback.passer_id == &team_params.qbs[0].player_id {
-                    true => 1,
-                    false => 2,
-                };
                 let qb_param = &team_params.skill_players[&dropback.passer_id];
-                let qb_injury_mult = match qb_depth == 1 {
+                let qb_injury_mult = match qb_param.depth_chart == 1 {
                     true => qb_param.injury_mult,
                     // assume backup qbs cannot get injured
                     false => 0.0,
@@ -110,7 +119,14 @@ impl Injury {
             PlayResult::DesignedRun(run) => {
                 let rusher_param = &team_params.skill_players[&run.carrier_id];
                 let rusher_key = (rusher_param.position, &run.carrier_id);
-                let rusher_injury_mult = rusher_param.injury_mult;
+                let rusher_injury_mult = match rusher_param.position {
+                    Position::Quarterback => match rusher_param.depth_chart {
+                        1 => rusher_param.injury_mult,
+                        // backup QBs cannot get injured
+                        _ => 0.0,
+                    },
+                    _ => rusher_param.injury_mult,
+                };
                 let outcome_prob = match run.outcome {
                     RushingOutcome::Yards(_, _) => SKILL_RUSH_YARDS_INJURY_PROB,
                     RushingOutcome::Touchdown => SKILL_RUSH_TD_INJURY_PROB,
@@ -172,6 +188,25 @@ pub enum InjuredDepthType {
 }
 
 impl TeamParams {
+    fn qb_at_depth(&self, depth: u8) -> (&Quarterback, &SkillPlayer) {
+        for qb in &self.qbs {
+            let skill = self.skill_players.get(&qb.player_id).unwrap();
+            if skill.depth_chart == depth {
+                return (qb, skill);
+            }
+        }
+        panic!("no qb at depth {}", depth);
+    }
+
+    pub fn quarterback(&self) -> &Quarterback {
+        let (qb1, qb1_skill) = self.qb_at_depth(1);
+        let (qb2, _) = self.qb_at_depth(2);
+        if qb1_skill.injury == Injury::Injured {
+            return qb2;
+        }
+        return qb1;
+    }
+
     pub fn update_injuries(&mut self, injuries: HashMap<Position, HashMap<String, Injury>>) {
         let inj_state = &mut self.injuries;
         for (pos, pos_injuries) in injuries {
@@ -180,7 +215,9 @@ impl TeamParams {
             }
             let pos_inj_state = inj_state.get_mut(&pos).unwrap();
             for (key, injury) in pos_injuries {
-                pos_inj_state.insert(key, injury);
+                if pos_inj_state.len() < *MAX_INJURIES_PER_POS.get(&pos).unwrap_or(&0) as usize {
+                    pos_inj_state.insert(key, injury);
+                }
             }
         }
     }
@@ -239,6 +276,7 @@ impl TeamParams {
         non_injured_players: &Vec<&SkillPlayer>,
         depth_type: DepthType,
         injured_depth_type: InjuredDepthType,
+        pos: Position,
     ) -> HashMap<String, f32> {
         let mut extra_ms_carries = HashMap::new();
 
@@ -282,15 +320,20 @@ impl TeamParams {
                 },
             };
 
-            extra_ms_carries.insert(
-                skill_player.player_id.clone(),
-                skill_player.ms_carries_init * mult,
-            );
+            let msc_init = match pos {
+                // when QB1 goes down, QB2 gets all of his MS carries,
+                // so we have to do this because usually QB2 will have 0.0 ms_carries_init
+                Position::Quarterback => skill_player.ms_carries_init.max(0.01),
+                _ => skill_player.ms_carries_init,
+            };
+            extra_ms_carries.insert(skill_player.player_id.clone(), msc_init * mult);
         }
 
         let extra_sum: f32 = extra_ms_carries.values().sum();
-        for (_, v) in extra_ms_carries.iter_mut() {
-            *v *= injured_ms_carries / extra_sum;
+        if extra_sum > 0.0 {
+            for (_, v) in extra_ms_carries.iter_mut() {
+                *v *= injured_ms_carries / extra_sum;
+            }
         }
         extra_ms_carries
     }
@@ -300,8 +343,13 @@ impl TeamParams {
         non_injured_players: &Vec<&SkillPlayer>,
         depth_type: DepthType,
         injured_depth_type: InjuredDepthType,
+        pos: Position,
     ) -> HashMap<String, f32> {
         let mut extra_ms_targets = HashMap::new();
+
+        if pos == Position::Quarterback {
+            return extra_ms_targets;
+        }
 
         for skill_player in non_injured_players {
             let mult = match depth_type {
@@ -350,8 +398,10 @@ impl TeamParams {
         }
 
         let extra_sum: f32 = extra_ms_targets.values().sum();
-        for (_, v) in extra_ms_targets.iter_mut() {
-            *v *= injured_ms_targets / extra_sum;
+        if extra_sum > 0.0 {
+            for (_, v) in extra_ms_targets.iter_mut() {
+                *v *= injured_ms_targets / extra_sum;
+            }
         }
         extra_ms_targets
     }
@@ -391,6 +441,7 @@ impl TeamParams {
             &non_injured_players,
             depth_type,
             injured_depth_type,
+            pos,
         );
         let injured_ms_targets: f32 = injured_players.iter().map(|p| p.ms_targets_init).sum();
         let extra_ms_targets = TeamParams::get_extra_ms_targets(
@@ -398,6 +449,7 @@ impl TeamParams {
             &non_injured_players,
             depth_type,
             injured_depth_type,
+            pos,
         );
         for (player_id, skill_player) in self.skill_players.iter_mut() {
             if injuries.contains_key(player_id) {
@@ -409,6 +461,26 @@ impl TeamParams {
                 skill_player.ms_targets_live =
                     skill_player.ms_targets_init + *extra_ms_targets.get(player_id).unwrap_or(&0.0);
             }
+        }
+        let new_car_sum: f32 = self
+            .skill_players
+            .values()
+            .map(|sp| sp.ms_carries_live)
+            .sum();
+        let new_tgt_sum: f32 = self
+            .skill_players
+            .values()
+            .map(|sp| sp.ms_targets_live)
+            .sum();
+        if new_car_sum == 0.0 {
+            log::info!("no carries for {}", team_pos);
+            log::info!("injuries: {:?}", injuries);
+            log::info!("{:#?}", self.skill_players);
+        }
+        if new_tgt_sum == 0.0 {
+            log::info!("no targets for {}", team_pos);
+            log::info!("injuries: {:?}", injuries);
+            log::info!("{:#?}", self.skill_players);
         }
     }
 }

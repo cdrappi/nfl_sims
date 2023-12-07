@@ -142,7 +142,16 @@ impl RushingModel {
 
     fn sim_rusher(sim: &GameSim) -> String {
         let probs = RushingModel::rusher_probs(sim);
-        random_discrete(probs)
+        match random_discrete(probs.clone()) {
+            Ok(rusher_id) => rusher_id,
+            Err(_we) => {
+                // log::error!("Could not sample rusher from {:?}", probs);
+                panic!(
+                    "Could not sample rusher. Injuries = {:?}",
+                    sim.offense_params().injuries
+                )
+            }
+        }
     }
 
     fn rusher_probs(sim: &GameSim) -> Vec<(String, f32)> {

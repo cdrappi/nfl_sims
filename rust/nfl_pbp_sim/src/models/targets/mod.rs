@@ -383,12 +383,21 @@ impl TargetModel {
         let ay_conditional_shares =
             TargetModel::adjust_target_shares_by_air_yards(sim, &ytg_conditional_shares, air_yards);
         // log::info!(
-        //     "air yards = {}\nYTG conditional = {:?}\nAY conditional = {:?}",
+        //     "air yards = {}, YTG = {}\nYTG conditional = {:?}\nAY conditional = {:?}",
         //     air_yards,
+        //     yards_to_goal,
         //     ytg_conditional_shares,
         //     ay_conditional_shares
         // );
-        random_discrete(ay_conditional_shares)
+        match random_discrete(ay_conditional_shares) {
+            Ok(receiver_id) => receiver_id,
+            Err(_we) => {
+                panic!(
+                    "Failed to sim receiver. Injuries = {:?}",
+                    sim.offense_params().injuries
+                );
+            }
+        }
     }
 
     fn adjust_target_shares_by_air_yards(
@@ -599,7 +608,7 @@ impl TargetModel {
             HomeAway::Away => (&sim.game_params.away, &sim.game_params.home),
         };
 
-        let qb = &offense.qbs[0];
+        let qb = &offense.quarterback();
         let receiver = offense.skill_players.get(receiver_id).unwrap();
 
         let log_qb_scramble = (qb.scramble_rate + EPSILON).ln();

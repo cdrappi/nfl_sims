@@ -1,9 +1,5 @@
-use std::collections::HashMap;
-
 use crate::start::{GameStart, HomeAway};
-
-use crate::state::clock::GameClock;
-use crate::state::clock::Quarter;
+use crate::state::clock::{GameClock, Quarter};
 use crate::state::down::PlayState;
 
 #[derive(Debug, Clone)]

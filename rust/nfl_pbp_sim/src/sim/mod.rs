@@ -1,8 +1,6 @@
 pub mod box_score;
 pub mod play_result;
 
-use std::collections::HashMap;
-
 use crate::{
     game_loop::{
         field_goals::FG_SNAP_DISTANCE,
@@ -23,9 +21,7 @@ use crate::{
         rushing::RushingModel,
         two_point_attempt::TwoPointAttemptModel,
     },
-    params::{
-        skill_player::Position, team, GameParams, GameParamsDistribution, Injury, TeamParams,
-    },
+    params::{GameParams, GameParamsDistribution, Injury, TeamParams},
     start::{GameStart, HomeAway},
     state::{
         clock::Quarter,
@@ -289,7 +285,7 @@ impl GameSim {
     }
 
     fn passer_id(&self) -> String {
-        self.offense_params().qbs[0].player_id.clone()
+        self.offense_params().quarterback().player_id.clone()
     }
 
     fn rush_result(&self) -> RunResult {
