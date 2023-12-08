@@ -1,13 +1,16 @@
 use std::collections::HashMap;
 
-use crate::models::targets::PROB_RZ_TARGET;
 use crate::params::RushingParams;
 use crate::util::stats::sample_beta;
 
 use csv::Reader;
 use serde::Deserialize;
 
-use super::Injury;
+use crate::params::Injury;
+
+pub const PROB_RZ_TARGET: f32 = 0.1307;
+pub const PROB_1YTG_GIVEN_CARRY: f32 = 0.102;
+pub const PROB_GZ_GIVEN_CARRY: f32 = 0.063;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Deserialize)]
 pub enum Position {
@@ -72,7 +75,7 @@ impl Position {
 #[derive(Clone, Debug)]
 pub enum MarketShare {
     Constant(f32),
-    Beta(f32, f32),
+    Random(f32, f32),
 }
 
 impl MarketShare {
@@ -88,18 +91,25 @@ impl MarketShare {
                         ms,
                         std_val
                     );
-                    let alpha = ms.powi(2) * ((1.0 - ms) / std_val.powi(2) - 1.0 / ms);
-                    let beta = alpha * (1.0 / ms - 1.0);
-                    MarketShare::Beta(alpha, beta)
+                    MarketShare::Random(ms, std_val)
                 }
             },
         }
     }
 
+    pub fn to_beta_params(ms: f32, std_val: f32) -> (f32, f32) {
+        let alpha = ms.powi(2) * ((1.0 - ms) / std_val.powi(2) - 1.0 / ms);
+        let beta = alpha * (1.0 / ms - 1.0);
+        (alpha, beta)
+    }
+
     pub fn collapse(&self) -> f32 {
         match self {
             MarketShare::Constant(ms) => *ms,
-            MarketShare::Beta(shape_a, shape_b) => sample_beta(*shape_a, *shape_b),
+            MarketShare::Random(ms, std) => {
+                let (shape_a, shape_b) = MarketShare::to_beta_params(*ms, *std);
+                sample_beta(shape_a, shape_b)
+            }
         }
     }
 }
@@ -204,6 +214,45 @@ impl SkillPlayerDistribution {
             injury_mult: self.injury_mult,
         }
     }
+
+    pub fn update_ms_targets(&self, realized_ms_targets: f32) -> SkillPlayerDistribution {
+        let ms_targets = match self.ms_targets {
+            MarketShare::Random(old_mean, std) => {
+                let new_mean = match old_mean == 0.0 {
+                    true => 0.0,
+                    false => old_mean.powi(2) / realized_ms_targets,
+                };
+                MarketShare::Random(new_mean, std)
+            }
+            MarketShare::Constant(old_mean) => {
+                let new_mean = match old_mean == 0.0 {
+                    true => 0.0,
+                    false => old_mean.powi(2) / realized_ms_targets,
+                };
+                MarketShare::Constant(new_mean)
+            }
+        };
+        SkillPlayerDistribution {
+            player_id: self.player_id.clone(),
+            team: self.team.clone(),
+            name: self.name.clone(),
+            position: self.position,
+            depth_chart: self.depth_chart,
+            ms_carries: self.ms_carries.clone(),
+            ms_targets,
+            prob_1ytg_given_carry: self.prob_1ytg_given_carry,
+            prob_gz_given_carry: self.prob_gz_given_carry,
+            ryoe: self.ryoe,
+            ryoe_std: self.ryoe_std,
+            prob_rz_given_target: self.prob_rz_given_target,
+            adot: self.adot,
+            adot_std: self.adot_std,
+            prob_catch_oe: self.prob_catch_oe,
+            xyac: self.xyac,
+            yac_oe: self.yac_oe,
+            injury_mult: self.injury_mult,
+        }
+    }
 }
 
 #[derive(Clone, Debug, serde::Deserialize)]
@@ -252,11 +301,20 @@ impl SkillPlayerLoader {
             depth_chart: self.depth_chart,
             ms_carries: MarketShare::new(self.ms_carries.unwrap_or(0.0), self.msc_std),
             ms_targets: MarketShare::new(self.ms_targets.unwrap_or(0.0), self.mst_std),
-            prob_1ytg_given_carry: self.prob_1ytg_given_carry.unwrap_or(0.102).max(0.00_01),
-            prob_gz_given_carry: self.prob_gz_given_carry.unwrap_or(0.063).max(0.00_01),
+            prob_1ytg_given_carry: self
+                .prob_1ytg_given_carry
+                .unwrap_or(PROB_1YTG_GIVEN_CARRY)
+                .max(0.00_01),
+            prob_gz_given_carry: self
+                .prob_gz_given_carry
+                .unwrap_or(PROB_GZ_GIVEN_CARRY)
+                .max(0.00_01),
             ryoe: self.ryoe.unwrap_or(0.0),
             ryoe_std: self.ryoe_std.unwrap_or(3.0),
-            prob_rz_given_target: self.prob_rz_given_target.unwrap_or(PROB_RZ_TARGET),
+            prob_rz_given_target: self
+                .prob_rz_given_target
+                .unwrap_or(PROB_RZ_TARGET)
+                .max(PROB_RZ_TARGET / 4.0),
             adot: self.adot.unwrap_or(5.0),
             adot_std: self.adot_std.unwrap_or(5.0),
             prob_catch_oe: self.prob_catch_oe.unwrap_or(0.0),

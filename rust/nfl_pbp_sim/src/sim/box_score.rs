@@ -103,7 +103,7 @@ impl BoxScore {
         BoxScore {
             score: Score::new(),
             plays: Plays::new(),
-            passers: HashMap::new(),
+            passers: PassingBoxScore::new_map(params),
             skill_players: SkillPlayerBoxScore::new_map(params),
             defenses: DefenseBoxScore::new_map(home.clone(), away.clone()),
             kickers: KickerBoxScore::new_map(home.clone(), away.clone()),
@@ -418,7 +418,12 @@ impl BoxScore {
     fn apply_run_stats(&mut self, run_result: &RunResult, prev_state: &PlayState) {
         // TODO: add post rush penalties
         // TODO: add post-non-target penalties e.g. sacks
-        self.plays.increment(prev_state.possession(), false, false);
+        self.plays.increment(
+            prev_state.possession(),
+            false,
+            false,
+            prev_state.expect_downtogo(),
+        );
         self.apply_run_result(run_result, prev_state);
     }
 
@@ -455,8 +460,12 @@ impl BoxScore {
             DropbackOutcome::Target(_) => true,
             _ => false,
         };
-        self.plays
-            .increment(prev_state.possession(), true, is_target);
+        self.plays.increment(
+            prev_state.possession(),
+            true,
+            is_target,
+            prev_state.expect_downtogo(),
+        );
         self.apply_passer_stats(dropback_result);
         self.apply_receiver_stats(dropback_result);
         self.apply_defense_stats(dropback_result, prev_state);

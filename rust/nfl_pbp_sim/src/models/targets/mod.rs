@@ -1,25 +1,24 @@
 pub mod coef;
 
+use std::collections::HashMap;
+
+use crate::models::{
+    dropback::{EPSILON_AIR_YARDS, MEAN_AIR_YARDS},
+    features::{PlaycallFeatures, EPSILON},
+    shares::compute_conditional_shares,
+};
 use crate::params::skill_player::SkillPlayer;
+use crate::sim::{
+    play_result::{ReceivingYards, TargetOutcome, TargetResult, TurnoverOutcome},
+    GameSim,
+};
+use crate::start::HomeAway;
+use crate::state::yards_to_goal::YardsToGoal;
 use crate::util::stats::{
     double_truncated_poisson, negbinom_pmf, normal_cdf, poisson_pmf, random_discrete,
     random_sigmoid, sigmoid_prob, truncated_negbinom, truncated_poisson,
 };
 
-use crate::state::yards_to_goal::YardsToGoal;
-use crate::{
-    models::{
-        dropback::{EPSILON_AIR_YARDS, MEAN_AIR_YARDS},
-        features::{PlaycallFeatures, EPSILON},
-    },
-    sim::{
-        play_result::{ReceivingYards, TargetOutcome, TargetResult, TurnoverOutcome},
-        GameSim,
-    },
-    start::HomeAway,
-};
-
-pub const PROB_RZ_TARGET: f32 = 0.1307;
 const PROB_COMPLETION: f32 = 0.60;
 const PROB_INTERCEPTION: f32 = 0.025;
 
@@ -379,7 +378,7 @@ impl TargetModel {
     }
 
     fn simulate_receiver(sim: &GameSim, air_yards: i8, yards_to_goal: YardsToGoal) -> String {
-        let ytg_conditional_shares = TargetModel::target_shares_by_location(sim, yards_to_goal.0);
+        let ytg_conditional_shares = TargetModel::target_shares_by_location(sim, yards_to_goal);
         let ay_conditional_shares =
             TargetModel::adjust_target_shares_by_air_yards(sim, &ytg_conditional_shares, air_yards);
         // log::info!(
@@ -464,33 +463,24 @@ impl TargetModel {
         id_shares
     }
 
-    fn target_shares_by_location(sim: &GameSim, yards_to_goal: u8) -> Vec<(String, f32)> {
-        /*
-        P(target|GZ) = P(target) * P(gz|target) / P(gz)
-        P(target|noGZ) = P(target) * (1 - P(GZ|target)) / P(noGZ)
-        */
-        let mut id_shares = vec![];
+    fn target_shares_by_location(sim: &GameSim, yards_to_goal: YardsToGoal) -> Vec<(String, f32)> {
         let offense = sim.offense_params();
-        let mut cumsum = 0.0;
+
+        let mut team_loc_probs = HashMap::new();
+        team_loc_probs.insert(true, offense.team.prob_rz_given_target);
+
+        let mut marginal_shares = HashMap::new();
+        let mut player_loc_probs = HashMap::new();
         for (pid, player) in offense.skill_players.iter() {
-            let marginal_share = player.ms_targets_live;
-            let (rz_adj, loc_prior) = match yards_to_goal <= 20 {
-                true => (player.prob_rz_given_target, PROB_RZ_TARGET),
-                false => (1.0 - player.prob_rz_given_target, 1.0 - PROB_RZ_TARGET),
-            };
-            let posterior_share = marginal_share * rz_adj / loc_prior;
-            cumsum += posterior_share;
-            id_shares.push((pid.clone(), posterior_share));
+            marginal_shares.insert(pid.clone(), player.ms_targets_live);
+            let mut player_rz_probs = HashMap::new();
+            player_rz_probs.insert(true, player.prob_rz_given_target);
+            player_loc_probs.insert(pid.clone(), player_rz_probs);
         }
 
-        // if cumsum == 0.0 {
-        //     log::info!("loc air yards cumsum = 0.0. {}", yards_to_goal);
-        // }
-        for (_, share) in id_shares.iter_mut() {
-            *share /= cumsum;
-        }
-
-        id_shares
+        let cond_shares =
+            compute_conditional_shares(marginal_shares, player_loc_probs, team_loc_probs, false);
+        cond_shares[&yards_to_goal.is_redzone()].clone()
     }
 
     fn get_z(features: &TargetModel, coef: &TargetModel) -> f32 {

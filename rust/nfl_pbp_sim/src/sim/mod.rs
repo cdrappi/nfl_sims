@@ -21,7 +21,7 @@ use crate::{
         rushing::RushingModel,
         two_point_attempt::TwoPointAttemptModel,
     },
-    params::{GameParams, GameParamsDistribution, Injury, TeamParams},
+    params::{injury::Injury, GameParams, GameParamsDistribution, TeamParams},
     start::{GameStart, HomeAway},
     state::{
         clock::Quarter,
@@ -131,10 +131,13 @@ impl GameSim {
         let play_call = choose_playcall(&self);
         let result: PlayResult = self.play_result(&play_call);
         log::debug!("{}\n", result);
-        let injuries = Injury::sim_injuries(&result, self.offense_params());
-        self.game_params
-            .update_injuries(self.game_state.play.possession(), injuries);
-        self.apply_injuries();
+
+        if self.game_params.sim_injuries {
+            let injuries = Injury::sim_injuries(&result, self.offense_params());
+            self.game_params
+                .update_injuries(self.game_state.play.possession(), injuries);
+            self.apply_injuries();
+        }
 
         // add stats to the box score
         self.box_score.apply_stats(&result, &self.game_state.play);
@@ -608,11 +611,14 @@ impl GameSim {
     }
 }
 
-pub fn sim_game(game_params: &GameParamsDistribution) -> BoxScore {
+pub fn sim_game(game_params: &GameParamsDistribution, sim_injuries: bool) -> BoxScore {
     let game_start = GameStart::new();
     let kicks_h2_start = game_start.received_h1.clone();
     let game_state = GameState::new(game_start);
-    let mut sim = GameSim::new(game_params.to_game_params(), game_state);
+    let mut sim = GameSim::new(
+        game_params.to_game_params().injuries(sim_injuries),
+        game_state,
+    );
     // log::info!("\n\nbeginning of game");
     // let (mut last_play, mut last_result) = (
     //     sim.game_state.play.clone(),

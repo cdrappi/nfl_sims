@@ -1,5 +1,7 @@
 pub mod coef;
 
+use std::collections::HashMap;
+
 use crate::state::yards_to_goal::YardsToGoal;
 use crate::util::stats::{random_discrete, random_sigmoid, truncated_negbinom, truncated_poisson};
 use crate::{
@@ -14,6 +16,8 @@ use crate::{
 };
 
 use crate::models::post_rush_penalty::PostRushPenaltyModel;
+
+use super::shares::compute_conditional_shares;
 
 const RUSHING_EPSILON: f32 = 0.01;
 const YARDS_PER_DESIGNED_RUN: f32 = 4.25;
@@ -145,40 +149,47 @@ impl RushingModel {
         match random_discrete(probs.clone()) {
             Ok(rusher_id) => rusher_id,
             Err(_we) => {
-                // log::error!("Could not sample rusher from {:?}", probs);
                 panic!(
-                    "Could not sample rusher. Injuries = {:?}",
-                    sim.offense_params().injuries
+                    "Could not sample rusher\nInjuries = {:?}\nProbs: {:?}",
+                    sim.offense_params().injuries,
+                    &probs
                 )
             }
         }
     }
 
     fn rusher_probs(sim: &GameSim) -> Vec<(String, f32)> {
-        let mut id_shares = vec![];
-
-        let situation = sim.game_state.play.expect_downtogo().rushing_situation();
         let offense = sim.offense_params();
-        let mut cumsum = 0.0;
 
-        for (id, rusher) in offense.skill_players.iter() {
-            let marginal_share = rusher.ms_carries_live;
-            let loc_adj = match situation {
-                RushingSituation::OneYardToGo => rusher.prob_1ytg_given_carry,
-                RushingSituation::GreenZone => rusher.prob_gz_given_carry,
-                RushingSituation::Normal => {
-                    1.0 - rusher.prob_1ytg_given_carry - rusher.prob_gz_given_carry
-                }
-            };
-            let posterior_share = marginal_share * loc_adj;
-            cumsum += posterior_share;
-            id_shares.push((id.clone(), posterior_share));
+        let mut team_loc_probs = HashMap::new();
+        team_loc_probs.insert(
+            RushingSituation::OneYardToGo,
+            offense.team.prob_1ytg_given_carry,
+        );
+        team_loc_probs.insert(
+            RushingSituation::GreenZone,
+            offense.team.prob_gz_given_carry,
+        );
+
+        let mut marginal_shares = HashMap::new();
+        let mut player_loc_probs = HashMap::new();
+        for (pid, player) in offense.skill_players.iter() {
+            marginal_shares.insert(pid.clone(), player.ms_carries_live);
+            let mut player_rz_probs = HashMap::new();
+            player_rz_probs.insert(RushingSituation::OneYardToGo, player.prob_1ytg_given_carry);
+
+            player_rz_probs.insert(RushingSituation::GreenZone, player.prob_gz_given_carry);
+            player_loc_probs.insert(pid.clone(), player_rz_probs);
         }
 
-        for (_, posterior_share) in id_shares.iter_mut() {
-            *posterior_share /= cumsum;
-        }
-        id_shares
+        let cond_shares = compute_conditional_shares(
+            marginal_shares,
+            player_loc_probs,
+            team_loc_probs,
+            RushingSituation::Normal,
+        );
+        let situation = sim.game_state.play.expect_downtogo().rushing_situation();
+        cond_shares[&situation].clone()
     }
 
     fn sim_designed_run_outcome(sim: &GameSim, rusher_id: &String) -> RushingOutcome {

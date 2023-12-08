@@ -1,3 +1,4 @@
+pub mod injury;
 pub mod quarterback;
 pub mod skill_player;
 pub mod team;
@@ -8,15 +9,15 @@ use lazy_static::lazy_static;
 use serde::Deserialize;
 use std::collections::HashMap;
 
+use crate::params::injury::Injury;
 use crate::params::skill_player::{Position, SkillPlayerDistribution};
 use crate::params::weather::StadiumType;
 use crate::params::{
     quarterback::Quarterback, skill_player::SkillPlayer, team::Team, weather::Weather,
 };
 use crate::sim::box_score::SalaryKey;
-use crate::sim::play_result::{DropbackOutcome, PlayResult, RushingOutcome, TargetOutcome};
 use crate::start::HomeAway;
-use crate::util::stats::random_bool;
+use crate::state::game_state::TeamPlays;
 
 lazy_static! {
     static ref MAX_INJURIES_PER_POS: HashMap<Position, u8> = {
@@ -30,124 +31,57 @@ lazy_static! {
     };
 }
 
+#[derive(Debug)]
+pub struct TeamFpCounts {
+    pub targets_rz: usize,
+    pub carries_1ytg: usize,
+    pub carries_gz: usize,
+    pub n_targets: usize,
+    pub n_carries: usize,
+}
+
+#[derive(Debug)]
+pub struct TeamFpParams {
+    pub prob_rz_given_target: f32,
+    pub prob_1ytg_given_carry: f32,
+    pub prob_gz_given_carry: f32,
+}
+
+impl TeamFpCounts {
+    pub fn new() -> TeamFpCounts {
+        TeamFpCounts {
+            carries_1ytg: 0,
+            carries_gz: 0,
+            targets_rz: 0,
+            n_targets: 0,
+            n_carries: 0,
+        }
+    }
+
+    pub fn to_probs(&self) -> TeamFpParams {
+        let n_carries = self.n_carries as f32;
+        TeamFpParams {
+            prob_1ytg_given_carry: self.carries_1ytg as f32 / n_carries,
+            prob_gz_given_carry: self.carries_gz as f32 / n_carries,
+            prob_rz_given_target: self.targets_rz as f32 / self.n_targets as f32,
+        }
+    }
+
+    pub fn add(&mut self, team_plays: &TeamPlays) {
+        self.n_targets += team_plays.targets as usize;
+        self.n_carries += team_plays.run as usize;
+        self.carries_1ytg += team_plays.run_1ytg as usize;
+        self.carries_gz += team_plays.run_gz as usize;
+        self.targets_rz += team_plays.targets_rz as usize;
+    }
+}
+
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct PlayerMeta {
     pub name: String,
     pub pos: Position,
     pub team: String,
     pub opp: String,
-}
-
-#[derive(Clone, Hash, PartialEq, serde::Serialize, Debug)]
-pub enum Injury {
-    Healthy,
-    // if injured, when will they return?
-    // default assume out for game
-    Injured,
-}
-
-// Carries
-pub const SKILL_RUSH_YARDS_INJURY_PROB: f32 = 0.00_25;
-// (they'll slide)
-pub const QB_CARRY_INJURY_PROB: f32 = 0.00_25;
-// really shouldn't be possible...
-pub const SKILL_RUSH_TD_INJURY_PROB: f32 = 0.00_01;
-// should be more likely than normal yards
-pub const SKILL_RUSH_SAFETY_INJURY_PROB: f32 = 2.0 * SKILL_RUSH_YARDS_INJURY_PROB;
-// should be MUCH more likely than normal yards
-pub const SKILL_RUSH_FUMLOST_INJURY_PROB: f32 = 10.0 * SKILL_RUSH_YARDS_INJURY_PROB;
-
-// dropbacks for QBs
-pub const QB_SCRAMBLE_INJURY_PROB: f32 = 0.00_50;
-pub const QB_SACKED_INJURY_PROB: f32 = 0.01;
-pub const QB_THROW_INJURY_PROB: f32 = 0.00_01;
-
-// targets for skill
-pub const SKILL_CATCH_YARDS_INJURY_PROB: f32 = 0.00_25;
-pub const SKILL_CATCH_TD_INJURY_PROB: f32 = 0.00_01;
-pub const SKILL_INCOMPLETE_INJURY_PROB: f32 = 0.00_10;
-pub const SKILL_INT_INJURY_PROB: f32 = 0.00_05;
-pub const SKILL_CATCH_FUMBLE_INJURY_PROB: f32 = 0.01;
-
-impl Injury {
-    /// returns hashmap of players who have a different injury status than before the play
-    /// for now, just means a list of guys who got injured    
-    pub fn sim_injuries(
-        play_result: &PlayResult,
-        team_params: &TeamParams,
-    ) -> HashMap<Position, HashMap<String, Injury>> {
-        let mut injuries = HashMap::new();
-        let player_probs = match play_result {
-            PlayResult::Dropback(dropback) => {
-                let qb_param = &team_params.skill_players[&dropback.passer_id];
-                let qb_injury_mult = match qb_param.depth_chart == 1 {
-                    true => qb_param.injury_mult,
-                    // assume backup qbs cannot get injured
-                    false => 0.0,
-                };
-                let qb_key = (Position::Quarterback, &dropback.passer_id);
-                match &dropback.outcome {
-                    DropbackOutcome::QbScramble(_) => {
-                        vec![(qb_key, QB_SCRAMBLE_INJURY_PROB * qb_injury_mult)]
-                    }
-                    DropbackOutcome::Sack(_) => {
-                        vec![(qb_key, QB_SACKED_INJURY_PROB * qb_injury_mult)]
-                    }
-                    DropbackOutcome::Target(tgt) => {
-                        let tgted_param = &team_params.skill_players[&tgt.targeted_receiver_id];
-                        let tgt_injury_mult = tgted_param.injury_mult;
-                        let tgt_key = (tgted_param.position, &tgt.targeted_receiver_id);
-                        let outcome_prob = match tgt.outcome {
-                            TargetOutcome::Yards(_, _) => SKILL_CATCH_YARDS_INJURY_PROB,
-                            TargetOutcome::Touchdown(_) => SKILL_CATCH_TD_INJURY_PROB,
-                            TargetOutcome::Incomplete(_) => SKILL_INCOMPLETE_INJURY_PROB,
-                            TargetOutcome::Interception(_, _) => SKILL_INT_INJURY_PROB,
-                            TargetOutcome::CatchThenFumble(_, _) => SKILL_CATCH_FUMBLE_INJURY_PROB,
-                        };
-                        vec![
-                            (qb_key, qb_injury_mult * QB_THROW_INJURY_PROB),
-                            (tgt_key, tgt_injury_mult * outcome_prob),
-                        ]
-                    }
-                    DropbackOutcome::Throwaway => {
-                        vec![(qb_key, qb_injury_mult * QB_THROW_INJURY_PROB)]
-                    }
-                    // no injury possible
-                    DropbackOutcome::QbSpike => vec![],
-                }
-            }
-            PlayResult::DesignedRun(run) => {
-                let rusher_param = &team_params.skill_players[&run.carrier_id];
-                let rusher_key = (rusher_param.position, &run.carrier_id);
-                let rusher_injury_mult = match rusher_param.position {
-                    Position::Quarterback => match rusher_param.depth_chart {
-                        1 => rusher_param.injury_mult,
-                        // backup QBs cannot get injured
-                        _ => 0.0,
-                    },
-                    _ => rusher_param.injury_mult,
-                };
-                let outcome_prob = match run.outcome {
-                    RushingOutcome::Yards(_, _) => SKILL_RUSH_YARDS_INJURY_PROB,
-                    RushingOutcome::Touchdown => SKILL_RUSH_TD_INJURY_PROB,
-                    RushingOutcome::FumbleLost(_, _) => SKILL_RUSH_FUMLOST_INJURY_PROB,
-                    RushingOutcome::Safety => SKILL_RUSH_SAFETY_INJURY_PROB,
-                };
-                vec![(rusher_key, rusher_injury_mult * outcome_prob)]
-            }
-            _ => vec![],
-        };
-        for ((pos, player_id), injury_prob) in player_probs {
-            if random_bool(injury_prob) {
-                if !injuries.contains_key(&pos) {
-                    injuries.insert(pos, HashMap::new());
-                }
-                let pos_injuries = injuries.get_mut(&pos).unwrap();
-                pos_injuries.insert(player_id.clone(), Injury::Injured);
-            }
-        }
-        injuries
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -168,6 +102,54 @@ impl TeamParamsDistribution {
                 .map(|(k, v)| (k.clone(), v.to_skill_player()))
                 .collect(),
             injuries: HashMap::new(),
+        }
+    }
+
+    pub fn update_fp_params(&self, fp_params: &TeamFpParams) -> TeamParamsDistribution {
+        let tm = &self.team;
+        TeamParamsDistribution {
+            team: Team {
+                team: tm.team.clone(),
+                pace_z: tm.pace_z,
+                offense_proe: tm.offense_proe,
+                offense_rz_proe: tm.offense_rz_proe,
+                oline_rushing_z: tm.oline_rushing_z,
+                offense_pass_rush_z: tm.offense_pass_rush_z,
+                defense_proe: tm.defense_proe,
+                defense_rz_proe: tm.defense_rz_proe,
+                dline_rushing_z: tm.dline_rushing_z,
+                defense_pass_rush_z: tm.defense_pass_rush_z,
+                defense_completion_z: tm.defense_completion_z,
+                defense_interception_z: tm.defense_interception_z,
+                defense_yac_oe: tm.defense_yac_oe,
+                short_fg_z: tm.short_fg_z,
+                long_fg_z: tm.long_fg_z,
+                offense_penalty_z: tm.offense_penalty_z,
+                defense_penalty_z: tm.defense_penalty_z,
+                kickoff_returner_id: tm.kickoff_returner_id.clone(),
+                punt_returner_id: tm.punt_returner_id.clone(),
+                prob_1ytg_given_carry: fp_params.prob_1ytg_given_carry,
+                prob_gz_given_carry: fp_params.prob_gz_given_carry,
+                prob_rz_given_target: fp_params.prob_rz_given_target,
+            },
+            qbs: self.qbs.clone(),
+            skill_players: self.skill_players.clone(),
+        }
+    }
+
+    pub fn update_ms_targets(
+        &self,
+        realized_ms_targets: &HashMap<String, f32>,
+    ) -> TeamParamsDistribution {
+        let mut skill_players = HashMap::new();
+        for (player_id, sp) in &self.skill_players {
+            let new_sp = sp.update_ms_targets(realized_ms_targets[player_id]);
+            skill_players.insert(player_id.clone(), new_sp);
+        }
+        TeamParamsDistribution {
+            team: self.team.clone(),
+            qbs: self.qbs.clone(),
+            skill_players,
         }
     }
 }
@@ -202,6 +184,7 @@ impl TeamParams {
         let (qb1, qb1_skill) = self.qb_at_depth(1);
         let (qb2, _) = self.qb_at_depth(2);
         if qb1_skill.injury == Injury::Injured {
+            // log::info!("QB2 playing for {}", self.team.team);
             return qb2;
         }
         return qb1;
@@ -455,11 +438,13 @@ impl TeamParams {
             if injuries.contains_key(player_id) {
                 skill_player.ms_carries_live = 0.0;
                 skill_player.ms_targets_live = 0.0;
+                skill_player.injury = Injury::Injured;
             } else {
                 skill_player.ms_carries_live =
                     skill_player.ms_carries_init + *extra_ms_carries.get(player_id).unwrap_or(&0.0);
                 skill_player.ms_targets_live =
                     skill_player.ms_targets_init + *extra_ms_targets.get(player_id).unwrap_or(&0.0);
+                skill_player.injury = Injury::Healthy;
             }
         }
         let new_car_sum: f32 = self
@@ -508,6 +493,7 @@ impl GameParamsDistribution {
             away: self.away.to_team_params(),
             weather: self.weather.clone(),
             neutral_field: self.neutral_field,
+            sim_injuries: true,
         }
     }
 }
@@ -518,6 +504,7 @@ pub struct GameParams {
     pub away: TeamParams,
     pub weather: Weather,
     pub neutral_field: bool,
+    pub sim_injuries: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -547,6 +534,16 @@ impl GameLoader {
 }
 
 impl GameParams {
+    pub fn injuries(&self, sim_injuries: bool) -> GameParams {
+        GameParams {
+            home: self.home.clone(),
+            away: self.away.clone(),
+            weather: self.weather.clone(),
+            neutral_field: self.neutral_field,
+            sim_injuries,
+        }
+    }
+
     pub fn get_team(&self, team: HomeAway) -> &TeamParams {
         match team {
             HomeAway::Home => &self.home,
@@ -729,6 +726,42 @@ impl GameParams {
             time_map.insert(game.home.team.team.clone(), game.weather.start_time.clone());
         }
         time_map
+    }
+
+    pub fn update_fp_params(
+        gp_dist: &Vec<GameParamsDistribution>,
+        team_fp_params: &HashMap<String, TeamFpParams>,
+    ) -> Vec<GameParamsDistribution> {
+        gp_dist
+            .iter()
+            .cloned()
+            .map(|gp| GameParamsDistribution {
+                home: gp
+                    .home
+                    .update_fp_params(&team_fp_params[&gp.home.team.team]),
+                away: gp
+                    .away
+                    .update_fp_params(&team_fp_params[&gp.away.team.team]),
+                weather: gp.weather,
+                neutral_field: gp.neutral_field,
+            })
+            .collect()
+    }
+
+    pub fn update_ms_targets(
+        gp_dist: &Vec<GameParamsDistribution>,
+        realized_ms_targets: &HashMap<String, f32>,
+    ) -> Vec<GameParamsDistribution> {
+        gp_dist
+            .iter()
+            .cloned()
+            .map(|gp| GameParamsDistribution {
+                home: gp.home.update_ms_targets(realized_ms_targets),
+                away: gp.away.update_ms_targets(realized_ms_targets),
+                weather: gp.weather,
+                neutral_field: gp.neutral_field,
+            })
+            .collect()
     }
 }
 

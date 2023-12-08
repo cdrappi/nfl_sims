@@ -36,6 +36,10 @@ impl YardsToGoal {
         }
         None
     }
+
+    pub fn is_redzone(&self) -> bool {
+        return self.0 <= 20;
+    }
 }
 
 impl std::fmt::Display for YardsToGoal {

@@ -1,4 +1,9 @@
-use crate::sim::play_result::{DropbackOutcome, ReceivingYards, SackOutcome, TargetOutcome};
+use std::collections::HashMap;
+
+use crate::{
+    params::GameParams,
+    sim::play_result::{DropbackOutcome, ReceivingYards, SackOutcome, TargetOutcome},
+};
 
 #[derive(Debug, Clone)]
 pub struct PassingBoxScore {
@@ -30,6 +35,17 @@ impl PassingBoxScore {
             scrambles: 0,
             kneels: 0,
         }
+    }
+
+    pub fn new_map(game_params: &GameParams) -> HashMap<String, PassingBoxScore> {
+        let mut map = HashMap::new();
+        for player in &game_params.home.qbs {
+            map.insert(player.player_id.clone(), PassingBoxScore::new());
+        }
+        for player in &game_params.away.qbs {
+            map.insert(player.player_id.clone(), PassingBoxScore::new());
+        }
+        map
     }
 
     pub fn add_completion(&mut self, yards: &ReceivingYards) {

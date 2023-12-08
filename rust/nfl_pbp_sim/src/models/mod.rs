@@ -12,5 +12,6 @@ pub mod post_pass_penalty;
 pub mod post_rush_penalty;
 pub mod punt;
 pub mod rushing;
+pub mod shares;
 pub mod targets;
 pub mod two_point_attempt;
