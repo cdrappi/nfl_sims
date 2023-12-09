@@ -1,3 +1,4 @@
+pub mod burn_in;
 pub mod injury;
 pub mod quarterback;
 pub mod skill_player;
@@ -17,7 +18,8 @@ use crate::params::{
 };
 use crate::sim::box_score::SalaryKey;
 use crate::start::HomeAway;
-use crate::state::game_state::TeamPlays;
+
+use self::burn_in::TeamFpParams;
 
 lazy_static! {
     static ref MAX_INJURIES_PER_POS: HashMap<Position, u8> = {
@@ -29,51 +31,6 @@ lazy_static! {
         m.insert(Position::TightEnd, 2);
         m
     };
-}
-
-#[derive(Debug)]
-pub struct TeamFpCounts {
-    pub targets_rz: usize,
-    pub carries_1ytg: usize,
-    pub carries_gz: usize,
-    pub n_targets: usize,
-    pub n_carries: usize,
-}
-
-#[derive(Debug)]
-pub struct TeamFpParams {
-    pub prob_rz_given_target: f32,
-    pub prob_1ytg_given_carry: f32,
-    pub prob_gz_given_carry: f32,
-}
-
-impl TeamFpCounts {
-    pub fn new() -> TeamFpCounts {
-        TeamFpCounts {
-            carries_1ytg: 0,
-            carries_gz: 0,
-            targets_rz: 0,
-            n_targets: 0,
-            n_carries: 0,
-        }
-    }
-
-    pub fn to_probs(&self) -> TeamFpParams {
-        let n_carries = self.n_carries as f32;
-        TeamFpParams {
-            prob_1ytg_given_carry: self.carries_1ytg as f32 / n_carries,
-            prob_gz_given_carry: self.carries_gz as f32 / n_carries,
-            prob_rz_given_target: self.targets_rz as f32 / self.n_targets as f32,
-        }
-    }
-
-    pub fn add(&mut self, team_plays: &TeamPlays) {
-        self.n_targets += team_plays.targets as usize;
-        self.n_carries += team_plays.run as usize;
-        self.carries_1ytg += team_plays.run_1ytg as usize;
-        self.carries_gz += team_plays.run_gz as usize;
-        self.targets_rz += team_plays.targets_rz as usize;
-    }
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
