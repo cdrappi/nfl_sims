@@ -47,6 +47,7 @@ impl ToGo {
     }
 }
 
+#[derive(PartialEq, Hash, Eq, Clone, Copy, Debug)]
 pub enum RushingSituation {
     OneYardToGo,
     GreenZone,
@@ -99,6 +100,10 @@ impl DownToGo {
             (_, 0..=10) => RushingSituation::GreenZone,
             _ => RushingSituation::Normal,
         }
+    }
+
+    pub fn is_redzone(&self) -> bool {
+        return self.yards_to_goal.is_redzone();
     }
 }
 

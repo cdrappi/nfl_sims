@@ -1,8 +1,6 @@
 use crate::start::{GameStart, HomeAway};
-
-use crate::state::clock::GameClock;
-use crate::state::clock::Quarter;
-use crate::state::down::PlayState;
+use crate::state::clock::{GameClock, Quarter};
+use crate::state::down::{DownToGo, PlayState, RushingSituation};
 
 #[derive(Debug, Clone)]
 pub struct Score {
@@ -49,8 +47,11 @@ impl Score {
 pub struct TeamPlays {
     pub total: u8,
     pub run: u8,
+    pub run_1ytg: u8,
+    pub run_gz: u8,
     pub dropbacks: u8,
     pub targets: u8,
+    pub targets_rz: u8,
 }
 
 impl TeamPlays {
@@ -58,8 +59,11 @@ impl TeamPlays {
         TeamPlays {
             total: 0,
             run: 0,
+            run_1ytg: 0,
+            run_gz: 0,
             dropbacks: 0,
             targets: 0,
+            targets_rz: 0,
         }
     }
 }
@@ -78,7 +82,13 @@ impl Plays {
         }
     }
 
-    pub fn increment(&mut self, possession: HomeAway, is_pass: bool, is_target: bool) {
+    pub fn increment(
+        &mut self,
+        possession: HomeAway,
+        is_pass: bool,
+        is_target: bool,
+        down_to_go: DownToGo,
+    ) {
         let team_plays = match possession {
             HomeAway::Home => &mut self.home,
             HomeAway::Away => &mut self.away,
@@ -87,11 +97,25 @@ impl Plays {
         match is_pass {
             true => {
                 if is_target {
-                    team_plays.targets += 1
+                    team_plays.targets += 1;
+                    if down_to_go.is_redzone() {
+                        team_plays.targets_rz += 1;
+                    }
                 }
                 team_plays.dropbacks += 1;
             }
-            false => team_plays.run += 1,
+            false => {
+                team_plays.run += 1;
+                match down_to_go.rushing_situation() {
+                    RushingSituation::OneYardToGo => {
+                        team_plays.run_1ytg += 1;
+                    }
+                    RushingSituation::GreenZone => {
+                        team_plays.run_gz += 1;
+                    }
+                    _ => {}
+                }
+            }
         }
     }
 }

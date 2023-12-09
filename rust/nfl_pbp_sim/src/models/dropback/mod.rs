@@ -124,7 +124,7 @@ impl DropbackModel {
                 HomeAway::Home => &sim.game_params.home,
                 HomeAway::Away => &sim.game_params.away,
             };
-            let qb = &offense.qbs[0];
+            let qb = &offense.quarterback();
             let outcome = RushingModel::simulate_scramble(sim);
             let dbo = DropbackOutcome::QbScramble(RunResult {
                 carrier_id: qb.player_id.clone(),

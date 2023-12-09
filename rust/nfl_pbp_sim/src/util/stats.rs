@@ -4,20 +4,21 @@ extern crate statrs;
 
 use rand::distributions::{Distribution, WeightedIndex};
 use rand::Rng;
-use rand_distr::Poisson;
+use rand_distr::{Poisson, WeightedError};
 use statrs::distribution::{
     Beta, ContinuousCDF, Discrete, NegativeBinomial, Normal, Poisson as PoissonDist,
 };
 
-pub fn random_discrete<T: Clone + std::fmt::Debug>(weighted_choices: Vec<(T, f32)>) -> T {
+pub fn random_discrete<T: Clone + std::fmt::Debug>(
+    weighted_choices: Vec<(T, f32)>,
+) -> Result<T, WeightedError> {
     let weighted_index: WeightedIndex<f32> =
-        WeightedIndex::new(weighted_choices.iter().map(|(_, w)| *w))
-            .expect(format!("{:?}", weighted_choices).as_str());
+        WeightedIndex::new(weighted_choices.iter().map(|(_, w)| *w))?;
 
     let choices: Vec<&T> = weighted_choices.iter().map(|(s, _)| s).collect();
     let mut rng = rand::thread_rng();
     let choice = weighted_index.sample(&mut rng);
-    choices[choice].clone()
+    Ok(choices[choice].clone())
 }
 
 pub fn random_bool(prob_true: f32) -> bool {
@@ -66,7 +67,7 @@ pub fn double_truncated_poisson(lambda: f32, min_inclusive: u8, max_exclusive: u
     let choices = (min_inclusive..max_exclusive)
         .map(|x| (x, pdf_func(x)))
         .collect();
-    random_discrete(choices)
+    random_discrete(choices).unwrap()
 }
 pub fn truncated_poisson(lambda: f32, max_exclusive: u8) -> u8 {
     double_truncated_poisson(lambda, 0, max_exclusive)
@@ -133,7 +134,7 @@ pub fn double_truncated_negbinom(mean: f32, var: f32, min_inclusive: u8, max_exc
     let choices = (min_inclusive..max_exclusive)
         .map(|x| (x, pdf_func(x)))
         .collect();
-    random_discrete(choices)
+    random_discrete(choices).unwrap()
 }
 
 pub fn sample_beta(shape_a: f32, shape_b: f32) -> f32 {

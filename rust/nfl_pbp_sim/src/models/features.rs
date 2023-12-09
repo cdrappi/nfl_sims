@@ -355,8 +355,8 @@ impl PlaycallFeatures {
             offense_pace_z: offense.team.pace_z,
             offense_pass_rush_z: offense.team.offense_pass_rush_z,
             defense_pass_rush_z: defense.team.defense_pass_rush_z,
-            qb_scramble_rate: offense.qbs[0].scramble_rate,
-            qb_prob_sack_given_hit: offense.qbs[0].prob_sack_given_hit,
+            qb_scramble_rate: offense.quarterback().scramble_rate,
+            qb_prob_sack_given_hit: offense.quarterback().prob_sack_given_hit,
             defense_completion_z: defense.team.defense_completion_z,
             defense_interception_z: defense.team.defense_interception_z,
         }

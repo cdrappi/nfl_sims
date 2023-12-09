@@ -281,7 +281,7 @@ impl AirYardsModel {
             HomeAway::Away => (&sim.game_params.away, &sim.game_params.home),
         };
 
-        let qb = &offense.qbs[0];
+        let qb = &offense.quarterback();
 
         let log_qb_scramble = (f.qb_scramble_rate + EPSILON).ln();
         let log_qbps = (f.qb_prob_sack_given_hit + EPSILON).ln();
