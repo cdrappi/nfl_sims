@@ -21,6 +21,8 @@ use crate::start::HomeAway;
 
 use self::burn_in::TeamFpParams;
 
+const MAX_QB2_MS_RUSH: f32 = 0.08;
+
 lazy_static! {
     static ref MAX_INJURIES_PER_POS: HashMap<Position, u8> = {
         let mut m = HashMap::new();
@@ -272,7 +274,16 @@ impl TeamParams {
         let extra_sum: f32 = extra_ms_carries.values().sum();
         if extra_sum > 0.0 {
             for (_, v) in extra_ms_carries.iter_mut() {
-                *v *= injured_ms_carries / extra_sum;
+                let raw_to_add = injured_ms_carries / extra_sum;
+                let to_add = match pos {
+                    // this is to cover for a situation where a high rushing volume QB1 gets injured.
+                    // in this case, we don't want to give all of their carries to QB2,
+                    // so we cap it at a fixed number
+                    // Motivating example: Jalen Hurts with 30% MS carries getting injured
+                    Position::Quarterback => raw_to_add.min(MAX_QB2_MS_RUSH),
+                    _ => raw_to_add,
+                };
+                *v *= to_add;
             }
         }
         extra_ms_carries
