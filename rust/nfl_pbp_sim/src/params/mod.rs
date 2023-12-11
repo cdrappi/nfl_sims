@@ -21,7 +21,7 @@ use crate::start::HomeAway;
 
 use self::burn_in::TeamFpParams;
 
-const MAX_QB2_MS_RUSH: f32 = 0.08;
+const MAX_QB2_MS_RUSH: f32 = 0.05;
 
 lazy_static! {
     static ref MAX_INJURIES_PER_POS: HashMap<Position, u8> = {
