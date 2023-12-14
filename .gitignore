@@ -1,11 +1,9 @@
-# Ignore most of the data
+# Ignore pbp data
 data/*
 !data/pbp
 data/pbp/*
 !data/baselines
-data/baselines/*
 !data/slates
-data/slates/*
 
 # Secrets files:
 .env
