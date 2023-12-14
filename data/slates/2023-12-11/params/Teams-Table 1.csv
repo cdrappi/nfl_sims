@@ -1,0 +1,5 @@
+team,pace_z,offense_proe,offense_rz_proe,defense_proe,defense_rz_proe,oline_rushing_z,dline_rushing_z,offense_pass_rush_z,defense_pass_rush_z,defense_completion_z,defense_interception_z,defense_yac_oe,short_fg_z,long_fg_z,offense_penalty_z,defense_penalty_z,punt_returner_id,kickoff_returner_id
+GB,-0.76,0.01,0,0,-0.03,-0.2,-0.4,0.8,0.16,0.39,0.15,-0.22,0.41,-0.05,-0.58,-0.03,00-0039146,00-0035133
+NYG,0.19,0,-0.12,-0.012,-0.024,-0.6,-0.9,-1.94,-1.01,1.1,-0.37,0.2,0.45,0.27,0.26,0.6,00-0035645,00-0035639
+MIA,-0.8,0.03,0.02,0.014,-0.023,1.3,0.61,0.93,0.85,-0.8,-0.5,-0.44,0.38,0.4,-0.4,0.4,00-0034419,00-0034419
+TEN,-0.9,-0.059,-0.064,0.02,0,0.1,1.7,-2.01,0.09,-1.4,-1.1,-0.3,0.51,0.4,-0.6,0.2,00-0038961,00-0039032
