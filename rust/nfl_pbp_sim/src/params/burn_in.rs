@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::{
     params::{GameParams, GameParamsDistribution, PlayerMeta},
     sim::{
-        box_score::{BoxScore, SalaryKey},
+        box_score::{BoxScore, PlayerKey},
         run::sim_box_scores_rayon,
     },
     state::game_state::TeamPlays,
@@ -12,7 +12,7 @@ use crate::{
 pub fn burn_in_params(
     n: u32,
     game_params_vec: &Vec<GameParamsDistribution>,
-    player_meta: &HashMap<SalaryKey, PlayerMeta>,
+    player_meta: &HashMap<PlayerKey, PlayerMeta>,
 ) -> Vec<GameParamsDistribution> {
     // let burn_in_box_scores = sim_many(N_BURN_IN_FP, &game_params_vec);
     let burn_in_box_scores = sim_box_scores_rayon(n, &game_params_vec, false, "FP burn-in");
@@ -106,7 +106,7 @@ fn accumulate_team_fp_params(sims: &Vec<Vec<BoxScore>>) -> HashMap<String, TeamF
 
 fn accumulate_ms_targets(
     sims: &Vec<Vec<BoxScore>>,
-    player_meta: &HashMap<SalaryKey, PlayerMeta>,
+    player_meta: &HashMap<PlayerKey, PlayerMeta>,
 ) -> HashMap<String, f32> {
     let mut target_counts = HashMap::new();
     let mut team_target_counts = HashMap::new();
@@ -119,7 +119,7 @@ fn accumulate_ms_targets(
                 let player_tgts = target_counts.get_mut(player_id).unwrap();
                 *player_tgts += spb.targets as f32;
 
-                let team = &player_meta[&SalaryKey::NflId(player_id.clone())].team;
+                let team = &player_meta[&PlayerKey::NflId(player_id.clone())].team;
                 if !team_target_counts.contains_key(team) {
                     team_target_counts.insert(team.clone(), 0.0);
                 }
@@ -134,7 +134,7 @@ fn accumulate_ms_targets(
 
     let mut ms_targets = HashMap::new();
     for (player_id, target_count) in target_counts {
-        let team = &player_meta[&SalaryKey::NflId(player_id.clone())].team;
+        let team = &player_meta[&PlayerKey::NflId(player_id.clone())].team;
         ms_targets.insert(player_id.clone(), target_count / team_target_counts[team]);
     }
     // log::info!("Ms targets:\n{:#?}", ms_targets);

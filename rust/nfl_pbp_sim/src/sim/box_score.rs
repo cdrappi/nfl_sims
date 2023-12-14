@@ -723,23 +723,23 @@ pub struct KickingProjection {
 }
 
 #[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd)]
-pub enum SalaryKey {
+pub enum PlayerKey {
     NflId(String),
     TeamPos(String, Position),
 }
 
-impl SalaryKey {
+impl PlayerKey {
     pub fn expect_team(&self) -> String {
         match self {
-            SalaryKey::NflId(_) => panic!("Expected team, got nfl id"),
-            SalaryKey::TeamPos(team, _) => team.clone(),
+            PlayerKey::NflId(_) => panic!("Expected team, got nfl id"),
+            PlayerKey::TeamPos(team, _) => team.clone(),
         }
     }
 
     pub fn to_string(&self) -> String {
         match self {
-            SalaryKey::NflId(nfl_id) => nfl_id.clone(),
-            SalaryKey::TeamPos(team, pos) => format!("{}-{}", team, pos.to_string()),
+            PlayerKey::NflId(nfl_id) => nfl_id.clone(),
+            PlayerKey::TeamPos(team, pos) => format!("{}-{}", team, pos.to_string()),
         }
     }
 }

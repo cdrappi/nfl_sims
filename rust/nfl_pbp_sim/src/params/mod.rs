@@ -16,7 +16,7 @@ use crate::params::weather::StadiumType;
 use crate::params::{
     quarterback::Quarterback, skill_player::SkillPlayer, team::Team, weather::Weather,
 };
-use crate::sim::box_score::SalaryKey;
+use crate::sim::box_score::PlayerKey;
 use crate::start::HomeAway;
 
 use self::burn_in::TeamFpParams;
@@ -573,13 +573,13 @@ impl GameParams {
     }
 
     fn insert_returner(
-        map: &mut HashMap<SalaryKey, PlayerMeta>,
+        map: &mut HashMap<PlayerKey, PlayerMeta>,
         ret_id_opt: &Option<String>,
         team: &String,
         opp: &String,
     ) {
         if let Some(ret_id) = ret_id_opt {
-            let sk = SalaryKey::NflId(ret_id.clone());
+            let sk = PlayerKey::NflId(ret_id.clone());
             if !map.contains_key(&sk) {
                 map.insert(
                     sk,
@@ -596,13 +596,13 @@ impl GameParams {
 
     pub fn player_meta(
         game_params: &Vec<GameParamsDistribution>,
-    ) -> HashMap<SalaryKey, PlayerMeta> {
+    ) -> HashMap<PlayerKey, PlayerMeta> {
         let mut map = HashMap::new();
         for game in game_params {
             let home_team = &game.home.team.team;
             let away_team = &game.away.team.team;
             map.insert(
-                SalaryKey::TeamPos(home_team.clone(), Position::Kicker),
+                PlayerKey::TeamPos(home_team.clone(), Position::Kicker),
                 PlayerMeta {
                     name: format!("{} Kicker", home_team),
                     pos: Position::Kicker,
@@ -611,7 +611,7 @@ impl GameParams {
                 },
             );
             map.insert(
-                SalaryKey::TeamPos(home_team.clone(), Position::Defense),
+                PlayerKey::TeamPos(home_team.clone(), Position::Defense),
                 PlayerMeta {
                     name: format!("{} Defense", home_team),
                     pos: Position::Defense,
@@ -620,7 +620,7 @@ impl GameParams {
                 },
             );
             map.insert(
-                SalaryKey::TeamPos(away_team.clone(), Position::Kicker),
+                PlayerKey::TeamPos(away_team.clone(), Position::Kicker),
                 PlayerMeta {
                     name: format!("{} Kicker", away_team),
                     pos: Position::Kicker,
@@ -629,7 +629,7 @@ impl GameParams {
                 },
             );
             map.insert(
-                SalaryKey::TeamPos(away_team.clone(), Position::Defense),
+                PlayerKey::TeamPos(away_team.clone(), Position::Defense),
                 PlayerMeta {
                     name: format!("{} Defense", away_team),
                     pos: Position::Defense,
@@ -639,7 +639,7 @@ impl GameParams {
             );
             for (_, sp) in &game.home.skill_players {
                 map.insert(
-                    SalaryKey::NflId(sp.player_id.clone()),
+                    PlayerKey::NflId(sp.player_id.clone()),
                     PlayerMeta {
                         name: sp.name.clone(),
                         pos: sp.position.clone(),
@@ -650,7 +650,7 @@ impl GameParams {
             }
             for (_, sp) in &game.away.skill_players {
                 map.insert(
-                    SalaryKey::NflId(sp.player_id.clone()),
+                    PlayerKey::NflId(sp.player_id.clone()),
                     PlayerMeta {
                         name: sp.name.clone(),
                         pos: sp.position.clone(),

@@ -7,8 +7,6 @@ use crate::{
     util::clock::mins_secs,
 };
 
-pub const SIM_CHUNK_SIZE: usize = 200;
-
 pub fn sim_box_scores_rayon(
     n: u32,
     game_params: &Vec<GameParamsDistribution>,
@@ -22,16 +20,13 @@ pub fn sim_box_scores_rayon(
 
     let box_scores = (0..n)
         .into_par_iter()
-        .chunks(SIM_CHUNK_SIZE)
-        .flat_map(|chunk| {
-            chunk.into_par_iter().map(|_ii| {
-                let gp = game_params
-                    .iter()
-                    .map(|gp| sim_game(gp, sim_injuries))
-                    .collect::<Vec<BoxScore>>();
-                inc_progress_bar();
-                gp
-            })
+        .map(|_| {
+            let gp = game_params
+                .iter()
+                .map(|gp| sim_game(gp, sim_injuries))
+                .collect::<Vec<BoxScore>>();
+            inc_progress_bar();
+            gp
         })
         .collect::<Vec<Vec<BoxScore>>>();
 

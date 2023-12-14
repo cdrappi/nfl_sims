@@ -4,6 +4,8 @@ data/*
 data/pbp/*
 !data/baselines
 data/baselines/*
+!data/slates
+data/slates/*
 
 # Secrets files:
 .env
