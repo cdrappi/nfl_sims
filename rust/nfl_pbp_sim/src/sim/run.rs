@@ -40,7 +40,7 @@ pub fn sim_box_scores_rayon(
     let end_sim_time = std::time::Instant::now();
     let (mins, secs) = mins_secs(end_sim_time - start_time);
     log::info!(
-        "Simmed {} slates in {:.0}m {:.0}s. Now crunching lineups...",
+        "Simmed {} slates in {:.0}m {:.0}s",
         box_scores.len(),
         mins,
         secs
