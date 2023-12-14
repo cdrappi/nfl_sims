@@ -8,7 +8,7 @@ use crate::util::stats::random_bool;
 // Carries
 pub const SKILL_RUSH_YARDS_INJURY_PROB: f32 = 0.00_25;
 // (they'll slide)
-pub const QB_CARRY_INJURY_PROB: f32 = 0.00_25;
+pub const QB_CARRY_INJURY_PROB: f32 = 0.00_01;
 // really shouldn't be possible...
 pub const SKILL_RUSH_TD_INJURY_PROB: f32 = 0.00_01;
 // should be more likely than normal yards
@@ -17,9 +17,9 @@ pub const SKILL_RUSH_SAFETY_INJURY_PROB: f32 = 2.0 * SKILL_RUSH_YARDS_INJURY_PRO
 pub const SKILL_RUSH_FUMLOST_INJURY_PROB: f32 = 10.0 * SKILL_RUSH_YARDS_INJURY_PROB;
 
 // dropbacks for QBs
-pub const QB_SCRAMBLE_INJURY_PROB: f32 = 0.00_50;
-pub const QB_SACKED_INJURY_PROB: f32 = 0.01;
-pub const QB_THROW_INJURY_PROB: f32 = 0.00_01;
+pub const QB_SCRAMBLE_INJURY_PROB: f32 = 0.00_10;
+pub const QB_SACKED_INJURY_PROB: f32 = 0.00_25;
+pub const QB_THROW_INJURY_PROB: f32 = 0.00_001;
 
 // targets for skill
 pub const SKILL_CATCH_YARDS_INJURY_PROB: f32 = 0.00_25;

@@ -4,13 +4,13 @@ impl PuntModel {
 
     pub fn punt_block_coef() -> PuntModel {
         PuntModel {
-            intercept: -5.167,
-            is_offense_home: 0.182,
+            intercept: -5.179,
+            is_offense_home: 0.183,
             yardline_pct: 0.052,
             log_yardline_pct: 0.095,
             touchback_goodness: 0.075,
             log_touchback_goodness: 0.400,
-            yardline_tbg: 0.055,
+            yardline_tbg: 0.056,
             kick_distance_pct: 0.0,
             log_kick_distance_pct: 0.0,
             punted_to_pct: 0.0,
@@ -37,103 +37,103 @@ impl PuntModel {
 
     pub fn touchback_coef() -> PuntModel {
         PuntModel {
-            intercept: -16.125,
-            is_offense_home: -0.212,
-            yardline_pct: -0.014,
-            log_yardline_pct: -0.006,
-            touchback_goodness: -0.080,
-            log_touchback_goodness: 0.100,
-            yardline_tbg: -0.082,
-            kick_distance_pct: 0.216,
-            log_kick_distance_pct: 0.465,
-            punted_to_pct: -0.230,
-            log_punted_to_pct: -3.943,
+            intercept: -16.179,
+            is_offense_home: -0.211,
+            yardline_pct: -0.011,
+            log_yardline_pct: -0.003,
+            touchback_goodness: -0.075,
+            log_touchback_goodness: 0.097,
+            yardline_tbg: -0.074,
+            kick_distance_pct: 0.220,
+            log_kick_distance_pct: 0.469,
+            punted_to_pct: -0.231,
+            log_punted_to_pct: -3.956,
         }
     }
 
     pub fn fair_catch_coef() -> PuntModel {
         PuntModel {
-            intercept: -2.119,
-            is_offense_home: -0.001,
-            yardline_pct: -0.197,
-            log_yardline_pct: -0.229,
-            touchback_goodness: -0.109,
-            log_touchback_goodness: -0.581,
-            yardline_tbg: -0.172,
-            kick_distance_pct: -1.503,
-            log_kick_distance_pct: -2.873,
-            punted_to_pct: 1.306,
-            log_punted_to_pct: -0.394,
+            intercept: -2.032,
+            is_offense_home: -0.004,
+            yardline_pct: -0.187,
+            log_yardline_pct: -0.201,
+            touchback_goodness: -0.167,
+            log_touchback_goodness: -0.538,
+            yardline_tbg: -0.198,
+            kick_distance_pct: -1.517,
+            log_kick_distance_pct: -2.856,
+            punted_to_pct: 1.330,
+            log_punted_to_pct: -0.395,
         }
     }
 
     pub fn fumble_lost_coef() -> PuntModel {
         PuntModel {
-            intercept: -3.387,
-            is_offense_home: -0.024,
-            yardline_pct: -0.169,
-            log_yardline_pct: -0.240,
-            touchback_goodness: -0.252,
-            log_touchback_goodness: -0.468,
-            yardline_tbg: -0.307,
-            kick_distance_pct: -0.260,
-            log_kick_distance_pct: -0.596,
-            punted_to_pct: 0.091,
-            log_punted_to_pct: 0.107,
+            intercept: -3.341,
+            is_offense_home: -0.001,
+            yardline_pct: -0.176,
+            log_yardline_pct: -0.242,
+            touchback_goodness: -0.279,
+            log_touchback_goodness: -0.437,
+            yardline_tbg: -0.336,
+            kick_distance_pct: -0.265,
+            log_kick_distance_pct: -0.590,
+            punted_to_pct: 0.090,
+            log_punted_to_pct: 0.100,
         }
     }
 
     pub fn fumble_lost_return_td_coef() -> PuntModel {
         PuntModel {
-            intercept: -3.704,
-            is_offense_home: -0.078,
-            yardline_pct: -0.036,
-            log_yardline_pct: -0.058,
-            touchback_goodness: -0.090,
-            log_touchback_goodness: -0.195,
-            yardline_tbg: -0.075,
+            intercept: -3.726,
+            is_offense_home: -0.082,
+            yardline_pct: -0.035,
+            log_yardline_pct: -0.057,
+            touchback_goodness: -0.087,
+            log_touchback_goodness: -0.191,
+            yardline_tbg: -0.073,
             kick_distance_pct: 0.006,
-            log_kick_distance_pct: 0.018,
+            log_kick_distance_pct: 0.019,
             punted_to_pct: -0.042,
-            log_punted_to_pct: -0.244,
+            log_punted_to_pct: -0.242,
         }
     }
 
     pub fn punt_return_td_coef() -> PuntModel {
         PuntModel {
-            intercept: -5.121,
-            is_offense_home: 0.224,
-            yardline_pct: 0.067,
-            log_yardline_pct: 0.106,
-            touchback_goodness: 0.194,
-            log_touchback_goodness: 0.296,
+            intercept: -5.082,
+            is_offense_home: 0.198,
+            yardline_pct: 0.066,
+            log_yardline_pct: 0.105,
+            touchback_goodness: 0.197,
+            log_touchback_goodness: 0.303,
             yardline_tbg: 0.172,
             kick_distance_pct: 0.033,
             log_kick_distance_pct: 0.070,
-            punted_to_pct: 0.034,
-            log_punted_to_pct: -0.012,
+            punted_to_pct: 0.033,
+            log_punted_to_pct: -0.005,
         }
     }
 
     pub fn is_pos_punt_return_yards_coef() -> PuntModel {
         PuntModel {
-            intercept: 1.635,
-            is_offense_home: 0.097,
+            intercept: 1.633,
+            is_offense_home: 0.096,
             yardline_pct: 0.202,
-            log_yardline_pct: 0.228,
-            touchback_goodness: 0.111,
-            log_touchback_goodness: -0.090,
-            yardline_tbg: 0.325,
-            kick_distance_pct: 0.244,
-            log_kick_distance_pct: 0.282,
-            punted_to_pct: -0.041,
-            log_punted_to_pct: -0.590,
+            log_yardline_pct: 0.225,
+            touchback_goodness: 0.115,
+            log_touchback_goodness: -0.104,
+            yardline_tbg: 0.328,
+            kick_distance_pct: 0.245,
+            log_kick_distance_pct: 0.281,
+            punted_to_pct: -0.043,
+            log_punted_to_pct: -0.593,
         }
     }
 
     pub fn pos_punt_return_yards_coef() -> PuntModel {
         PuntModel {
-            intercept: 2.208,
+            intercept: 2.209,
             is_offense_home: -0.001,
             yardline_pct: 0.006,
             log_yardline_pct: 0.009,

@@ -32,6 +32,7 @@
     },
     "rust-analyzer.linkedProjects": [
         "./rust/nfl_pbp_sim/Cargo.toml",
+        "./rust/nfl_sim_example/Cargo.toml",
     ],
     "rust-analyzer.showUnlinkedFileNotification": false,
     "[python]": {
