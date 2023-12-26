@@ -7,15 +7,14 @@ pub mod coef;
 
 pub const PLAYCLOCK: u8 = 40;
 
-const MAX_NEXT_PLAY_CLOCK: u8 = 32;
+const MAX_NEXT_PLAY_CLOCK: u8 = 30;
 const MIN_NEXT_PLAY_CLOCK: u8 = 1;
 
 const MIN_TIME_TO_SPOT: u8 = 2;
-const MAX_TIME_TO_SPOT_PAUSED: u8 = 6;
-const MAX_TIME_TO_SPOT_RUNNING: u8 = 4;
+const MAX_TIME_TO_SPOT_PAUSED: u8 = 4;
 
 pub const MAX_PLAY_DURATION: u8 = 15;
-pub const MIN_PLAY_DURATION: u8 = 2;
+pub const MIN_PLAY_DURATION: u8 = 3;
 
 #[derive(Debug)]
 pub struct ClockModel {
@@ -99,26 +98,23 @@ impl ClockModel {
         let coefs = ClockModel::running_next_play_clock_coefs();
         let next_play_clock =
             ClockModel::gen_clock_model(coefs, &f, MIN_NEXT_PLAY_CLOCK, MAX_NEXT_PLAY_CLOCK);
-        let time_to_spot = {
-            let tts_c = ClockModel::time_to_spot_coefs();
-            ClockModel::gen_clock_model(tts_c, &f, MIN_TIME_TO_SPOT, MAX_TIME_TO_SPOT_RUNNING)
-        };
-        (time_to_spot + PLAYCLOCK - next_play_clock) as u16
+        (PLAYCLOCK - next_play_clock) as u16
     }
 
     pub fn sim_paused_runoff(sim: &GameSim, play_result: &PlayResult, play_duration: u16) -> u16 {
         let f = ClockModel::features(sim, play_result, play_duration);
         let time_to_spot = match random_bool(0.8) {
             true => {
-                // this case is for when the ball carrier goes out of bounds and is going *forwards*
+                // this case is for when the ball carrier goes out of bounds and is going *forwards*.
+                // the play clock starts immediately, but the game clock stops until the ball is re-spotted.
                 let tts_c = ClockModel::time_to_spot_coefs();
                 ClockModel::gen_clock_model(tts_c, &f, MIN_TIME_TO_SPOT, MAX_TIME_TO_SPOT_PAUSED)
                     as u8
             }
             false => {
-                // if the ball carrier goes out of bounds and is going *backwards*, then
-                // game clock stops until the ball is re-spotted,
-                // so the play clock and game clock are in sync here
+                // if the ball carrier goes out of bounds and is going *backwards*,
+                // then game clock stops until the ball is re-spotted,
+                // but the play clock keeps running
                 0
             }
         };
@@ -127,7 +123,7 @@ impl ClockModel {
         let next_play_clock =
             ClockModel::gen_clock_model(coefs, &f, MIN_NEXT_PLAY_CLOCK, MAX_NEXT_PLAY_CLOCK);
 
-        (time_to_spot + PLAYCLOCK - next_play_clock) as u16
+        (PLAYCLOCK - time_to_spot - next_play_clock) as u16
     }
 
     fn get_z(f: &ClockModel, c: &ClockModel) -> f32 {
