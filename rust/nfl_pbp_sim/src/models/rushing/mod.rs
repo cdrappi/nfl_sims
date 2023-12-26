@@ -88,11 +88,11 @@ pub struct RushingModel {
     log_std_yards: f32,
     yoe_mean: f32,
     yoe_std: f32,
-    yoe_var: f32,
     yardline_std: f32,
-    yardline_var: f32,
     togo_std: f32,
-    togo_var: f32,
+    // yoe_var: f32,
+    // yardline_var: f32,
+    // togo_var: f32,
     clock_runs_after: f32,
 }
 
@@ -439,7 +439,7 @@ impl RushingModel {
 
         let log_mean_yards = (mean_yards + rusher.yoe_mean).max(RUSHING_EPSILON).ln();
         let log_std_yards = rusher.yoe_std.max(RUSHING_EPSILON).ln();
-        let yoe_var = rusher.yoe_std * rusher.yoe_std;
+        // let yoe_var = rusher.yoe_std * rusher.yoe_std;
 
         z += coefs.clock_running * features.clock_running;
         z += coefs.possdiff_per_minute * features.possdiff_per_minute;
@@ -504,11 +504,11 @@ impl RushingModel {
         z += coefs.log_std_yards * log_std_yards;
         z += coefs.yoe_mean * rusher.yoe_mean;
         z += coefs.yoe_std * rusher.yoe_std;
-        z += coefs.yoe_var * yoe_var;
         z += coefs.yardline_std * features.yardline_pct * rusher.yoe_std;
-        z += coefs.yardline_var * features.yardline_pct * yoe_var;
         z += coefs.togo_std * features.z_ydstogo * rusher.yoe_std;
-        z += coefs.togo_var * features.z_ydstogo * yoe_var;
+        // z += coefs.yoe_var * yoe_var;
+        // z += coefs.yardline_var * features.yardline_pct * yoe_var;
+        // z += coefs.togo_var * features.z_ydstogo * yoe_var;
         z += coefs.clock_runs_after * clock_runs_after;
         z
     }

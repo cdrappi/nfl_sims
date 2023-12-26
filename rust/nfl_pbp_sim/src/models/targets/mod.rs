@@ -381,16 +381,17 @@ impl TargetModel {
         let ytg_conditional_shares = TargetModel::target_shares_by_location(sim, yards_to_goal);
         let ay_conditional_shares =
             TargetModel::adjust_target_shares_by_air_yards(sim, &ytg_conditional_shares, air_yards);
-        // log::info!(
-        //     "air yards = {}, YTG = {}\nYTG conditional = {:?}\nAY conditional = {:?}",
-        //     air_yards,
-        //     yards_to_goal,
-        //     ytg_conditional_shares,
-        //     ay_conditional_shares
-        // );
-        match random_discrete(ay_conditional_shares) {
+
+        match random_discrete(ay_conditional_shares.clone()) {
             Ok(receiver_id) => receiver_id,
             Err(_we) => {
+                log::info!(
+                    "air yards = {}, YTG = {}\nYTG conditional = {:?}\nAY conditional = {:?}",
+                    air_yards,
+                    yards_to_goal,
+                    ytg_conditional_shares,
+                    ay_conditional_shares
+                );
                 panic!(
                     "Failed to sim receiver. Injuries = {:?}",
                     sim.offense_params().injuries
