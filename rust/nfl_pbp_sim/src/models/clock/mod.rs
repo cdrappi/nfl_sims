@@ -6,14 +6,15 @@ use crate::sim::{play_result::PlayResult, GameSim};
 pub mod coef;
 
 pub const PLAYCLOCK: u8 = 40;
-const MAX_NEXT_PLAY_CLOCK: u8 = 32;
+
+const MAX_NEXT_PLAY_CLOCK: u8 = 30;
 const MIN_NEXT_PLAY_CLOCK: u8 = 1;
 
-const MAX_TIME_TO_SPOT: u8 = 10;
-const MIN_TIME_TO_SPOT: u8 = 3;
+const MIN_TIME_TO_SPOT: u8 = 2;
+const MAX_TIME_TO_SPOT_PAUSED: u8 = 4;
 
-pub const MAX_PLAY_DURATION: u8 = 10;
-pub const MIN_PLAY_DURATION: u8 = 2;
+pub const MAX_PLAY_DURATION: u8 = 15;
+pub const MIN_PLAY_DURATION: u8 = 3;
 
 #[derive(Debug)]
 pub struct ClockModel {
@@ -67,7 +68,7 @@ impl ClockModel {
         match play_result {
             PlayResult::PointAfterTouchdown(_) => 0,
             PlayResult::Timeout(_) => 0,
-            PlayResult::QbKneel(_) => 1,
+            PlayResult::QbKneel(_) => 3,
             PlayResult::QbSpike(_) => 1,
             _ => ClockModel::sample_play_duration(sim, play_result),
         }
@@ -104,13 +105,18 @@ impl ClockModel {
         let f = ClockModel::features(sim, play_result, play_duration);
         let time_to_spot = match random_bool(0.8) {
             true => {
-                // if the ball carrier goes out of bounds and is NOT going backwards, then
-                // game clock doesn't run after ballcarrier is out of bounds until ball is re-spotted,
-                // but the play clock does run, so e.g. the max game clock runoff is less than 40
+                // this case is for when the ball carrier goes out of bounds and is going *forwards*.
+                // the play clock starts immediately, but the game clock stops until the ball is re-spotted.
                 let tts_c = ClockModel::time_to_spot_coefs();
-                ClockModel::gen_clock_model(tts_c, &f, MIN_TIME_TO_SPOT, MAX_TIME_TO_SPOT) as u8
+                ClockModel::gen_clock_model(tts_c, &f, MIN_TIME_TO_SPOT, MAX_TIME_TO_SPOT_PAUSED)
+                    as u8
             }
-            false => 0,
+            false => {
+                // if the ball carrier goes out of bounds and is going *backwards*,
+                // then game clock stops until the ball is re-spotted,
+                // but the play clock keeps running
+                0
+            }
         };
 
         let coefs = ClockModel::paused_next_play_clock_coefs();
