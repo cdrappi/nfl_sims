@@ -17,7 +17,7 @@ pub fn burn_in_params(
     // let burn_in_box_scores = sim_many(N_BURN_IN_FP, &game_params_vec);
     let burn_in_box_scores = sim_box_scores_rayon(n, &game_params_vec, false, "FP burn-in");
     let team_fp_params = accumulate_team_fp_params(&burn_in_box_scores);
-    // log::info!("Team FP params:\n{:#?}", &team_fp_params);
+    log::info!("Team FP params:\n{:#?}", &team_fp_params);
     let game_params_fp: Vec<GameParamsDistribution> =
         GameParams::update_fp_params(&game_params_vec, &team_fp_params);
 

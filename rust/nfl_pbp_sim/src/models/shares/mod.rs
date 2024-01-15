@@ -33,7 +33,7 @@ pub fn compute_conditional_shares<T: Eq + Hash + Debug>(
 
     let remaining_prob = 1.0 - team_prob_sum;
     let mut cumsum = 0.0;
-    let mut remaining_shares = Vec::new();
+    let mut remaining_shares: Vec<(String, f32)> = Vec::new();
     for (pid, marginal_share) in marginal_shares.iter() {
         let non_remaining = non_remaining_contrib[pid];
         // marginal share = remaining_prob * X + non_remaining
@@ -42,6 +42,9 @@ pub fn compute_conditional_shares<T: Eq + Hash + Debug>(
         cumsum += remaining_share;
         remaining_shares.push((pid.clone(), remaining_share));
     }
+    // if cumsum == 0.0 {
+    //     log::info!("remaining cumsum = 0.0:\n{:?}", remaining_shares);
+    // }
     // log::info!("remaining cumsum: {} (should be exactly 1)", cumsum);
     for (_, share) in remaining_shares.iter_mut() {
         *share /= cumsum;

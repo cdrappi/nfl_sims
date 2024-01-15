@@ -149,8 +149,11 @@ impl RushingModel {
         match random_discrete(probs.clone()) {
             Ok(rusher_id) => rusher_id,
             Err(_we) => {
+                // RushingModel::rusher_probs(sim);
+                let situation = sim.game_state.play.expect_downtogo().rushing_situation();
                 panic!(
-                    "Could not sample rusher\nInjuries = {:?}\nProbs: {:?}",
+                    "Could not sample rusher\nSituation: {:?}\nInjuries = {:?}\nProbs: {:?}",
+                    situation,
                     sim.offense_params().injuries,
                     &probs
                 )
@@ -173,23 +176,42 @@ impl RushingModel {
 
         let mut marginal_shares = HashMap::new();
         let mut player_loc_probs = HashMap::new();
+        let mut live_mults = HashMap::new();
         for (pid, player) in offense.skill_players.iter() {
-            marginal_shares.insert(pid.clone(), player.ms_carries_live);
+            marginal_shares.insert(pid.clone(), player.ms_carries_init);
             let mut player_rz_probs = HashMap::new();
             player_rz_probs.insert(RushingSituation::OneYardToGo, player.prob_1ytg_given_carry);
 
             player_rz_probs.insert(RushingSituation::GreenZone, player.prob_gz_given_carry);
             player_loc_probs.insert(pid.clone(), player_rz_probs);
+
+            live_mults.insert(
+                pid.clone(),
+                if player.ms_carries_init == 0.0 {
+                    0.0
+                } else {
+                    player.ms_carries_live / player.ms_carries_init
+                },
+            );
         }
 
         let cond_shares = compute_conditional_shares(
-            marginal_shares,
-            player_loc_probs,
-            team_loc_probs,
+            marginal_shares.clone(),
+            player_loc_probs.clone(),
+            team_loc_probs.clone(),
             RushingSituation::Normal,
         );
+
         let situation = sim.game_state.play.expect_downtogo().rushing_situation();
-        cond_shares[&situation].clone()
+        let cond_results = cond_shares[&situation].clone();
+
+        cond_results
+            .into_iter()
+            .map(|(pid, init_cond_share)| {
+                let live_mult = live_mults[&pid];
+                (pid, init_cond_share * live_mult)
+            })
+            .collect::<Vec<(String, f32)>>()
     }
 
     fn sim_designed_run_outcome(sim: &GameSim, rusher_id: &String) -> RushingOutcome {
